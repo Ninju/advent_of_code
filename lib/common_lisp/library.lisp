@@ -5,11 +5,9 @@
 (ql:quickload :split-sequence)
 (ql:quickload "cl-ppcre")
 
-(defun alist-str-lookup (key alist)
-  (assoc key alist :test 'equal))
-
-(defun sum (numbers)
-  (reduce #'+ numbers))
+;; STRINGS (REGEX)
+(defun words (str &key (separator "\\s+"))
+  (ppcre:split separator (string-trim " " str)))
 
 (defun split-str-by-space (line)
   (split-sequence:split-sequence #\Space line))
@@ -20,11 +18,8 @@
                                  :test #'equal
                                  :remove-empty-subseqs t))
 
-(defun read-file-lines (filename)
-  (uiop:read-file-lines filename))
-
-(defun read-file-line-groups (filename &optional (separator ""))
-  (split-by "" (read-file-lines filename)))
+(defun string->integers (str &key (separator "\\s+"))
+  (mapcar #'parse-integer (words str :separator separator)))
 
 (defun greedy-match-as-strings (str)
   (remove nil (loop for idx from 0 to (length str)
@@ -32,6 +27,26 @@
 
 (defun concat-strings (lst)
   (format nil "~{~a~}" lst))
+
+;; FILES
+(defun read-file-lines (filename)
+  (uiop:read-file-lines filename))
+
+(defun read-file-line-groups (filename &optional (separator ""))
+  (split-by "" (read-file-lines filename)))
+
+;; ASSOCIATIVE LISTS
+(defun alist-str-lookup (key alist)
+  (assoc key alist :test 'equal))
+
+;; SEQUENCES (REDUCERS)
+(defun sum (numbers)
+  (reduce #'+ numbers))
+
+(defun product (numbers)
+  (reduce #'* numbers))
+
+;; SEQUENCES
 
 (defun seq-intersection (seq-a seq-b)
   (remove-duplicates
@@ -48,6 +63,7 @@
                                 'nil)))))
    :test #'equal))
 
+;; SEQUENCES (DEBUGGERS)
 (defun print-array-contents (a)
   (destructuring-bind (n m) (array-dimensions a)
     (loop for i from 0 below n do
@@ -89,11 +105,3 @@
          (destructuring-bind ,(reverse dims-rev) ,dims ; Dimensions reversed so that innermost is last
            ,result)))))
 
-;;   (nested-loop (i j) '(3 3)
-;;     (format nil '~d ~d~%' i j))
-
-;; (format nil "(~{~a~^ ~})" (list 1 2 3))
-
-;; (loop for i from 10 repeat 20 do
-;;       (if (= i 49)
-;;           (return :else)))
