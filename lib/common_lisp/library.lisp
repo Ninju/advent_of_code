@@ -89,11 +89,11 @@
          (destructuring-bind ,(reverse dims-rev) ,dims ; Dimensions reversed so that innermost is last
            ,result)))))
 
-  (nested-loop (i j) '(3 3)
-    (format nil '~d ~d~%' i j))
+;;   (nested-loop (i j) '(3 3)
+;;     (format nil '~d ~d~%' i j))
 
-(format nil "(~{~a~^ ~})" (list 1 2 3))
+;; (format nil "(~{~a~^ ~})" (list 1 2 3))
 
-(loop for i from 10 repeat 20 do
-      (if (= i 49)
-          (return :else)))
+;; (loop for i from 10 repeat 20 do
+;;       (if (= i 49)
+;;           (return :else)))
