@@ -24,6 +24,34 @@
 (ppcre:all-matches "ab" "abcdeafabhi")
  ; => (0 2 7 9)
 
+
+(ppcre:register-groups-bind ((#'parse-integer game-number) choices)
+    ("Game ([0-9]+): (.*;)*" "Game 1: 10 red, 7 green, 3 blue; 5 blue, 3 red, 10 green; 4 blue, 14 green, 7 red; 1 red, 11 green; 6 blue, 17 green, 15 red; 18 green, 7 red, 5 blue" :start 0)
+  (format nil "This is Game ~d, with choices ~% ~{~a~^~% ~}" game-number (ppcre:split ";" choices)))
+
+(ppcre:do-scans (mstart mend rstart rend "[0-9]" "move 19 from 1 to 10")
+  (format t "mmm.. what am i supposed to do with ~d ~d ~d ~d ~%" mstart mend rstart rend))
+
+;; one match at a time
+(ppcre:do-matches-as-strings (match "[0-9]+" "move 19 from 1 to 10")
+  (format t "MATCH: ~d ~%" match))
+
+(ppcre:do-register-groups
+    (what from to)
+    ("move ([0-9]+) from ([0-9]+) to ([0-9]+)"
+     "move 19 from 1 to 10")
+  (format t "MOVE: ~d FROM: ~d TO: ~d. THANKS~%" what from to))
+
+(ppcre:register-groups-bind
+    ((#'parse-integer what from to)) ;; can even call functions on matches!
+    ("move ([0-9]+) from ([0-9]+) to ([0-9]+)"
+     "move 19 from 1 to 10; move 18 from 10 to 6")
+  (list what from to))
+
+;; (ppcre:do-scans (m1 m2 r1 r2
+;;   "move ([0-9]+) from ([0-9]+) to ([0-9]+)"
+;;   "move 19 from 4 to 8; move 14 from 10 to 3")
+
 ;; -- LISTS
 (remove nil (list 1 2 'nil 3 4 'nil 5))
  ; => (1 2 3 4 5)
@@ -47,6 +75,38 @@
 (loop for idx from 0 below (length (list 1 2 3 4 5))
       collect idx)
  ; => (0 1 2 3 4)
+
+(defparameter *random* (loop repeat 1000 collect (random 10000)))
+;; aggregration keywords for loop
+(loop for i in *random*
+   counting (evenp i) into evens
+   counting (oddp i) into odds
+   summing i into total
+   maximizing i into max
+   minimizing i into min
+   finally (return (list min max total evens odds)))
+
+;; destructuring in loop
+(loop for (item . rest) on (list 1 2 3)
+    do (format t "~a" item)
+    when rest do (format t ", "))
+
+;; conditional looping
+(loop for i from 1 to 10
+      when (evenp i)
+      sum i into total
+      collect (list i total))
+
+;; named loops
+(loop named outer for list in (list (list 1 2 3) (list 4 5 6) (list 7 8 9)) do
+     (loop for item in list do
+          (if (> item 3)
+            (return-from outer item))))
+
+;; loop // thereis / always / never return T or NIL, e.g.
+(if (loop for n in (list 2 3 7 11 13 17) thereis (evenp n))
+    (format nil "Yes, at least one even number is prime")
+    (format nil "All primes are odd"))
 
 
 (reduce #'+ '(1 2 3 4 5 6 7 8 9 10)
