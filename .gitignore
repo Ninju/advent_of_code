@@ -5,3 +5,4 @@ tmp/
 
 **/setup.lisp
 aoc_lang_2022
+aoc_2023/init.lisp
