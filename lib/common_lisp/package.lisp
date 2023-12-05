@@ -5,6 +5,7 @@
    :concat-strings
    :split-str-by-space
    :greedy-match-as-strings
+   :extract-numbers-from-line
 
    ;; ASSOC lists
    :alist-str-lookup
