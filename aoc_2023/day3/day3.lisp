@@ -1,4 +1,4 @@
-(in-package :aoc_2022)
+(in-package :aoc_2023)
 
 (ql:quickload :split-sequence)
 (ql:quickload :cl-ppcre)
