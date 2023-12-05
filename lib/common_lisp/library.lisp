@@ -105,3 +105,28 @@
          (destructuring-bind ,(reverse dims-rev) ,dims ; Dimensions reversed so that innermost is last
            ,result)))))
 
+
+
+(defun max-width (list-of-lists)
+  (reduce #'max list-of-lists :key #'length))
+
+(defun get-column (2d-array col-no)
+    (destructuring-bind (w h) (array-dimensions 2d-array)
+      (loop for n from 0 below w
+            collect
+            (aref 2d-array n col-no))))
+
+(defun lists->2d-array (strings &key (initial-element nil))
+  (let* ((height (length strings))
+         (number-of-cols (max-width strings))
+         (result (make-array (list height number-of-cols)
+                             :initial-element initial-element)))
+    (loop for j from 0 below height
+          do
+             (let ((row (elt strings j)))
+               (loop for i from 0 below (length row)
+                     do
+                        (let ((cur (elt row i)))
+                          (setf (aref result j i) cur)))))
+          result))
+

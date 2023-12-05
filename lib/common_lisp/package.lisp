@@ -19,4 +19,6 @@
    :read-file-line-groups
 
    ;; 2D ARRAYS
-   :print-array-contents))
+   :print-array-contents
+   :lists->2d-array
+   :get-column))
