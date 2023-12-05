@@ -14,6 +14,8 @@
    :split-by
    :sum
    :seq-intersection
+   :pairs
+   :gen-range
 
    ;; FILE READING
    :read-file-lines

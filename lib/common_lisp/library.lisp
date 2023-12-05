@@ -53,6 +53,18 @@
 
 ;; SEQUENCES
 
+;; OR (ql:quickload :alexandria)
+;;    (alexandria:iota <length> :start <start> :step <step>)
+(defun gen-range (x0 x1) (loop for n from x0 to x1 collect n))
+
+(defun pairs (lst)
+  "(1 2 3 4) => ((1 2) (3 4))"
+  (loop for idx from 0 below (length lst) by 2
+        collect
+        (list (elt lst idx)
+              (elt lst (+ 1 idx)))))
+
+
 (defun seq-intersection (seq-a seq-b)
   (remove-duplicates
    (mapcar (lambda (common)
@@ -134,6 +146,5 @@
                         (let ((cur (elt row i)))
                           (setf (aref result j i) cur)))))
           result))
-
 
 
