@@ -5,6 +5,7 @@
 
 (defparameter example-input "/home/alex/src/workspace/advent_of_code/aoc_2023/day4/example.txt")
 (defparameter input "/home/alex/src/workspace/advent_of_code/aoc_2023/day4/input.txt")
+
 (defun get-main-lines ()
   (lib:read-file-lines input))
 
@@ -12,7 +13,6 @@
   (lib:read-file-lines example-input))
 
 (defparameter *lines* (get-example-lines))
-
 
 (defparameter example-line "Card 2: 13 32 20 16 61 | 61 30 68 82 17 32 24 19")
 
