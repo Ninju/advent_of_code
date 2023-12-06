@@ -47,10 +47,12 @@
               winning-distance)
           count 1))
 
+(defun main (filename)
+  (let ((times-and-distances
+          (loop for line in (lib:read-file-lines filename)
+                collect
+                (extract-time-and-distances line))))
+    (destructuring-bind (time distance) times-and-distances
+      (count-ways-to-win distance time))))
 
-(let ((times-and-distances
-        (loop for line in (get-main-lines)
-              collect
-              (extract-time-and-distances line))))
-  (destructuring-bind (time distance) times-and-distances
-    (count-ways-to-win distance time)))
+(main *input*)
