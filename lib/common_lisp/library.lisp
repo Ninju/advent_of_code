@@ -1,5 +1,3 @@
-(load "~/quicklisp/setup.lisp")
-
 (in-package :lib)
 
 (ql:quickload :split-sequence)
