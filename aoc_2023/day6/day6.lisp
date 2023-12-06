@@ -17,22 +17,12 @@
 (defun get-example-lines ()
   (lib:read-file-lines *example-input*))
 
-(defun main (&optional (filename *example-input*))
-  (let ((*lines* lib:read-file-lines filename))
-    (loop for line in *lines*
-          collect
-
-          (mapcar #'lib:extract-numbers-from-line (get-example-lines))
-          line)))
-
-(main)
-
 (defun remove-non-numbers (str)
   (ppcre:regex-replace-all "[^0-9 ]" str ""))
 
 (defun extract-time-and-distances (line)
-  (lib:extract-numbers-from-line
-   (remove-non-numbers line)))
+  (parse-integer
+   (apply #'concatenate 'string (ppcre:all-matches-as-strings "[0-9]" line))))
 
 (defun button-hold-to-distance (hold-time race-time-limit)
   (if (or (= hold-time 0)
@@ -50,17 +40,17 @@
           collect n))
 
 (defun count-ways-to-win (winning-distance race-time-limit)
-  (length (find-ways-to-win winning-distance race-time-limit)))
+  (format t "Finding solution: ~d ~d~%" winning-distance race-time-limit)
+  (loop for n from 1 below race-time-limit
+        when (>
+              (button-hold-to-distance n race-time-limit)
+              winning-distance)
+          count 1))
+
 
 (let ((times-and-distances
-        (loop for line in (get-example-lines)
+        (loop for line in (get-main-lines)
               collect
               (extract-time-and-distances line))))
-  (reduce #'*
-          (apply #'mapcar
-                 (lambda (time distance)
-                   (format t "Time: ~d, distance: ~d~%" time distance)
-                   (count-ways-to-win distance time))
-                 times-and-distances)))
-
-(find-ways-to-win 9 7)
+  (destructuring-bind (time distance) times-and-distances
+    (count-ways-to-win distance time)))
