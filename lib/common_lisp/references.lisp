@@ -200,3 +200,41 @@
 
 ;; literal binary number syntax
 #*101011
+
+
+;; PARALLEL PROCESSING
+(ql:quickload "serapeum") ;; get number of CPUs
+(ql:quickload "lparallel")
+
+ (defun show-kernel-info ()
+           (let ((name (lparallel:kernel-name))
+                 (count (lparallel:kernel-worker-count))
+                 (context (lparallel:kernel-context))
+                 (bindings (lparallel:kernel-bindings)))
+             (format t "Kernel name = ~a~%" name)
+             (format t "Worker threads count = ~d~%" count)
+             (format t "Kernel context = ~a~%" context)
+             (format t "Kernel bindings = ~a~%" bindings)))
+
+;; Seems to set :parts to the number of workers in lparallel:* functions
+(setf lparallel:*kernel*
+      (lparallel:make-kernel (serapeum:count-cpus) :name "custom-kernel"))
+
+(show-kernel-info)
+
+;; ALWAYS CLOSE THE KERNEL!
+(lparallel:end-kernel :wait t)
+
+;; NOTE: uses same function for the merging of results,
+;;       use `preduce-partial` for custom merge
+(lparallel:preduce #'+ #(1 2 3 4 5 6)
+                   :parts 2)             ;; => (reduce #'+
+                                         ;;      (list
+                                         ;;        (reduce #'+ #(1 2 3))
+                                         ;;        (reduce #'+ #(4 5 6)))
+
+(reduce #'* (lparallel:preduce-partial #'+ (loop for n from 0 to 100000000 collect n)))
+
+
+(reduce #'+
+        (list (reduce #'+ #(1 2 3)) (reduce #'+ #(4 5 6))))
