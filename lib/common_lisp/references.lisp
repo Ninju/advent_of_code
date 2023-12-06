@@ -1,3 +1,5 @@
+(load "~/quicklisp/setup.lisp")
+
 ;; REGULAR EXPRESSIONS
 (ql:quickload "cl-ppcre")
 
