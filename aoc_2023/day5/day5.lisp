@@ -4,6 +4,7 @@
 (defparameter input "/home/alex/src/workspace/advent_of_code/aoc_2023/day5/input.txt")
 
 (ql:quickload :alexandria)
+(ql:quickload :cl-ppcre)
 (ql:quickload :lparallel)
 
 (defparameter *number-of-workers* 10)
