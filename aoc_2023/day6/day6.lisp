@@ -19,14 +19,10 @@
    (apply #'concatenate 'string (ppcre:all-matches-as-strings "[0-9]" line))))
 
 (defun button-hold-to-distance (hold-time race-time-limit)
-  (if (or (= hold-time 0)
-          (>= hold-time race-time-limit))
-      0
-      (let ((time-remaining (- race-time-limit hold-time)))
-        (* hold-time time-remaining))))
+  (let ((time-remaining (- race-time-limit hold-time)))
+    (* hold-time time-remaining)))
 
 (defun find-ways-to-win (winning-distance race-time-limit)
-  (format t "Finding solution: ~d ~d~%" winning-distance race-time-limit)
   (loop for n from 1 below race-time-limit
         when (>
               (button-hold-to-distance n race-time-limit)
@@ -34,7 +30,6 @@
           collect n))
 
 (defun count-ways-to-win (winning-distance race-time-limit)
-  (format t "Finding solution: ~d ~d~%" winning-distance race-time-limit)
   (loop for n from 1 below race-time-limit
         when (>
               (button-hold-to-distance n race-time-limit)
@@ -49,4 +44,5 @@
     (destructuring-bind (time distance) times-and-distances
       (count-ways-to-win distance time))))
 
-(main *input*)
+(time
+ (main *input*))
