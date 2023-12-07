@@ -124,21 +124,17 @@
 (defun rank-high-card (hand)
   (reduce #'max hand :key #'rank-card))
 
-(loop for line in (lib:read-file-lines example-input)
-      collect
-      (destructuring-bind (hand bid) (parse-hand-and-bid line)
-        (list hand bid)))
-
 (defun sort-bids-from-input (input-file)
   (arrows:-<>> (lib:read-file-lines input-file)
                (mapcar #'parse-hand-and-bid)
                (stable-sort <> #'(lambda (a b) (compare-rank (car a) (car b))))))
 
-(let* ((input-file input)
-       (bids (sort-bids-from-input input-file))
-       (number-of-hands (length bids)))
-  (loop for n from 1 to number-of-hands
-        sum
-        (destructuring-bind (hand bid) (elt bids (- n 1))
-          (let ((row-number-rank (+ 1 (- number-of-hands n))))
-            (* bid row-number-rank)))))
+(defun main ()
+  (let* ((input-file input)
+         (bids (sort-bids-from-input input-file))
+         (number-of-hands (length bids)))
+    (loop for n from 1 to number-of-hands
+          sum
+          (destructuring-bind (hand bid) (elt bids (- n 1))
+            (let ((row-number-rank (+ 1 (- number-of-hands n))))
+              (* bid row-number-rank))))))
