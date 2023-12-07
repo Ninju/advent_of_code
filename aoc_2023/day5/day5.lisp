@@ -152,11 +152,13 @@
               (range-length (elt xs (+ 1 idx))))
           (alexandria:iota range-length :start range-start :step 1))))
 
-;; (let ((*seeds* *input-seeds*))
-;;   (let ((answer (main input)))
-;;     (format t "The P Answer IS: ~d~%" answer)
-;;     (format t "~&THE ONSWER IS: ~d~%" (reduce #'min answer))
-;;     (format nil "~d" answer)))
+(defun main ()
+  (let ((*seeds* *input-seeds*))
+    (let ((answer (main input)))
+      (format t "The P Answer IS: ~d~%" answer)
+      (format t "~&THE ONSWER IS: ~d~%" (reduce #'min answer))
+      (format nil "~d" answer))))
+
 
 ;; processing in parallel I got these minimal values given the different seeds (start + range length) :
 ;; #(2369814042 2324727144 427916783 199602917 2254687 811357077 1153910022
