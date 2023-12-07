@@ -3,8 +3,9 @@
 (defparameter example-input "/home/alex/src/workspace/advent_of_code/aoc_2023/day7/example.txt")
 (defparameter input #p"/home/alex/src/workspace/advent_of_code/aoc_2023/day7/input.txt")
 
-(defparameter *card-ranking* (reverse "AKQJT98765432"))
-
+(defparameter *card-ranking* (reverse "AKQT98765432J"))
+(defparameter highest-ranked-card #\A)
+(defconstant +joker-char+ #\J)
 
 (ql:quickload :arrows)
 (ql:quickload :cl-ppcre)
@@ -56,22 +57,46 @@
              (if (= 2 (count c hand))
                  (return T)))))
 
-(defun rank (hand)
-  (if (five-of-a-kind-p hand)
-      100
-      (if (four-of-a-kind-p hand)
-          99
-          (if (full-house-p hand)
-              98
-              (if (three-of-a-kind-p hand)
-              97
-                  (if (two-pair-p hand)
-                      96
-                      (if (one-pair-p hand)
-                          95
-                          10)))))))
+(defun frequencies (str)
+  (loop for c across (remove-duplicates str)
+        collect
+        (cons c (count c str))))
 
-(one-pair-p "AKQQJ")
+(defun char->string (char)
+  (coerce (vector char) 'string))
+
+(defun replace-all-char (char str replacement)
+  (ppcre:regex-replace-all (char->string char) str replacement))
+
+(defun hand-with-joker-optimally-replaced (hand)
+  (let ((count-jokers (count +joker-char+ hand))
+        (hand-without-jokers (replace-all-char +joker-char+ hand ""))
+        (unique-chars (remove-duplicates hand)))
+    (if (= 0 count-jokers)
+        hand
+        (if (= (length hand) count-jokers)
+            (replace-all-char +joker-char+ hand (char->string highest-ranked-card))
+            (let ((most-frequent-char (caar (sort (frequencies hand-without-jokers)
+                                                  #'>
+                                                  :key #'cdr))))
+              (replace-all-char +joker-char+ hand (char->string most-frequent-char)))))))
+
+(defun rank (hand)
+  (if (position +joker-char+ hand)
+      (rank (hand-with-joker-optimally-replaced hand))
+      (if (five-of-a-kind-p hand)
+          100
+          (if (four-of-a-kind-p hand)
+              99
+              (if (full-house-p hand)
+                  98
+                  (if (three-of-a-kind-p hand)
+                      97
+                      (if (two-pair-p hand)
+                          96
+                          (if (one-pair-p hand)
+                              95
+                              10))))))))
 
 (defun compare-rank (h1 h2)
   (let ((rank-a (rank h1))
@@ -93,15 +118,6 @@
                  (return-from result (> (car ranking) (cdr ranking)))))
     T))
 
-;; (card-by-card-rankings "KJJTT" "KK677")
-;; (compare-rank "KJJTT" "KK677")
-;; (compare-rank "KK677" "KJJTT")
-
-;; (compare-rank "36325" "26557")
-;; (rank "36325")
-;; (rank "26557")
-;; (card-by-card-rankings "36325" "26557")
-
 (defun rank-card (card)
   (position card *card-ranking*))
 
@@ -118,14 +134,6 @@
                (mapcar #'parse-hand-and-bid)
                (stable-sort <> #'(lambda (a b) (compare-rank (car a) (car b))))))
 
-  (arrows:-<>> (lib:read-file-lines input)
-               (mapcar #'parse-hand-and-bid)
-               (mapcar #'car)
-               (stable-sort <> #'compare-rank)
-               (mapcar (lambda (h)
-                         (format t "~&~a (~d)~%" h
-                                 (rank h)))))
-
 (let* ((input-file input)
        (bids (sort-bids-from-input input-file))
        (number-of-hands (length bids)))
@@ -133,23 +141,4 @@
         sum
         (destructuring-bind (hand bid) (elt bids (- n 1))
           (let ((row-number-rank (+ 1 (- number-of-hands n))))
-  ;;           (cons hand row-number-rank))))))
-          (* bid row-number-rank)))))
-
- ; => 248453531 (28 bits, #xECF199B)
- ; => 252549368 (28 bits, #xF0D98F8) (if changing to (compare-rank (car b) (car a))
-
-;  => 248451132 (28 bits, #xECF103C) TOO LOW
-;  => 249965703 (28 bits, #xEE62C87) TOO HIGH
-;; (arrows:-> (list '("CCCCC" "AAAAB" "AABAB" "AACAB" "CABAB" "CKBAB" "CKBAD"))
-;;            (sort #'> :key #'rank))
-
-(compare-rank "77888" "77788") ;; => T
-(compare-rank "77788" "77888") ;; => NIL
-
-(compare-rank "33332" "2AAAA") ;; => T
-(compare-rank "2AAAA" "33332") ;; => NIl
-
-(stable-sort #(1 2 4 3 1)
-      #'(lambda (a b)
-          T))
+            (* bid row-number-rank)))))
