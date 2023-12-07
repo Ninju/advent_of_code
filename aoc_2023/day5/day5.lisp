@@ -159,34 +159,3 @@
       (format t "~&THE ONSWER IS: ~d~%" (reduce #'min answer))
       (format nil "~d" answer))))
 
-
-;; processing in parallel I got these minimal values given the different seeds (start + range length) :
-;; #(2369814042 2324727144 427916783 199602917 2254687 811357077 1153910022
-  ;; 1410417518 95285571 369762034))
-
-
-
-;; 2254687 also incorrect ARGHHH!!!
-;; 2254708 - Incorrect????
- ; TOO HIGH
-  ; => 2258308 (22 bits, #x227584)
- ; => 2258308 (22 bits, #x227584)
- ; => 199602917 (28 bits, #xBE5B2E5)
-
-(let ((*seeds* *input-seeds*)
-      (filename input))
-  (let ((maps (build-maps
-               (discard-headers
-                (get-maps
-                 (get-lines filename))))))
-    (let ((answer (loop for seed-info in (pairs *seeds*)
-                        minimizing
-                        (destructuring-bind (range-start range-length) seed-info
-                          (loop for n from range-start below (+ range-start range-length)
-                                minimizing
-                                (location-number n maps))))))
-      (format t "ANSWER Via the old code: ~d" answer)
-      (format nil "ANSWER Via the old code: ~d" answer))))
-
-
- ; => 2254686 (22 bits, #x22675F)
