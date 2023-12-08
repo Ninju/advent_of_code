@@ -1,16 +1,20 @@
 (in-package :aoc_2023)
 
+(ql:quickload :alexandria)
+(ql:quickload :arrows)
 (ql:quickload :cl-ppcre)
 
 (defparameter example-input #p"/home/alex/src/workspace/advent_of_code/aoc_2023/day8/example.txt")
 (defparameter test-input #p"/home/alex/src/workspace/advent_of_code/aoc_2023/day8/test.txt")
 (defparameter input #p"/home/alex/src/workspace/advent_of_code/aoc_2023/day8/input.txt")
 
+(defparameter part2-example-input #p"/home/alex/src/workspace/advent_of_code/aoc_2023/day8/part2_example.txt")
+
 (defparameter map-entry-partition-regex
   (ppcre:create-scanner "\\s+=\\s+"))
 
 (defparameter map-entry-lhs-rhs-regex
-  (ppcre:create-scanner "([a-zA-Z]+)\\s*,\\s*([a-zA-Z]+)"))
+  (ppcre:create-scanner "([0-9a-zA-Z]+)\\s*,\\s*([0-9a-zA-Z]+)"))
 
 (defconstant left-move #\L)
 (defconstant right-move #\R)
@@ -74,24 +78,73 @@
 (defun peek-move (starting-location move map)
   (getmap map move starting-location))
 
+(defparameter *test-hsh* (make-hash-table :test #'equal))
+
+(defun _search-locations
+    (number-locations-searched pred map starting-locations visited-hsh)
+  (let ((locations
+          (arrows:-<>> starting-locations
+                      (remove-duplicates <> :test #'equal)
+                      (remove-if (lambda (loc) (gethash loc visited-hsh)))
+                      (remove-if pred))))
+    (if (= 0 (length locations))
+        number-locations-searched
+        (_search-max-depth-to-locations
+         (+ number-locations-searched (length locations))
+         pred
+         map
+         (mapcan (lambda (loc)
+                   (let ((left-loc  (peek-move loc left-move  map))
+                         (right-loc (peek-move loc right-move map)))
+                     (setf (gethash loc visited-hsh) T)
+                     (list left-loc right-loc)))
+                 locations)
+         visited-hsh))))
+
+(defun search-max-depth-to-locations (pred map starting-locations)
+  (let ((visited-hsh (make-hash-table :test #'equal)))
+    (_search-locations 0
+                       pred
+                       map
+                       starting-locations
+                       visited-hsh)))
+
+(defun remove-first-char (str)
+  (subseq str 1))
+
+(defun all-map-locations (map)
+  (let ((keys (alexandria:hash-table-keys map)))
+    (remove-duplicates (mapcar #'remove-first-char keys)
+                       :test #'equal)))
+
 (destructuring-bind ((movements) map-entry-strings) (lib:read-file-line-groups input)
-  (let ((moves (make-instance 'circular-list :sequence movements))
-        (map (lines->map-entries map-entry-strings)))
-    (format t "~5&STARTING LOOP!~2%" current-move current-location)
-    (loop
-      with current-location = "AAA"
-      and current-move = (next moves)
-      until (string= "ZZZ" current-location)
-      count
-          (progn
-            (format t "~2&Next move: ~a, Current location: ~a~%" current-move current-location)
-            (let ((next-location (peek-move current-location current-move map))
-                  (next-move (next moves)))
+  (let ((map (lines->map-entries map-entry-strings)))
+    (let ((starting-locations (remove-if-not (lambda (loc)
+                                               (char= (elt loc (- (length loc) 1))
+                                                      #\A))
+                                             (all-map-locations map))))
 
-              (format t "Starting at ~a moving to ~a (having moved ~a)~%"
-                      current-location
-                      next-location
-                      current-move)
+    (search-max-depth-to-locations (lambda (loc)
+                                     (char= (elt loc (- (length loc) 1)) #\Z))
+                                   map
+                                   starting-locations))))
 
-              (setf current-location next-location)
-              (setf current-move     next-move))))))
+
+    ;; (format t "~5&STARTING LOOP!~2%" current-move current-location)
+    ;; (loop
+    ;;   with current-location = "AAA"
+    ;;   and current-move = (next moves)
+    ;;   until (string= "ZZZ" current-location)
+    ;;   count
+    ;;       (progn
+    ;;         (format t "~2&Next move: ~a, Current location: ~a~%" current-move current-location)
+    ;;         (let ((next-location (peek-move current-location current-move map))
+    ;;               (next-move (next moves)))
+
+    ;;           (format t "Starting at ~a moving to ~a (having moved ~a)~%"
+    ;;                   current-location
+    ;;                   next-location
+    ;;                   current-move)
+
+    ;;           (setf current-location next-location)
+    ;;           (setf current-move     next-move))))))
