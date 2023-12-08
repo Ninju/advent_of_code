@@ -69,16 +69,13 @@
     (loop for entry in map-entries
           do
              (destructuring-bind (key left right) entry
-               (format t "KEY: ~a, Left: ~a, Right: ~a~%" key left right)
                (setf (getmap hsh left-move  key) left)
                (setf (getmap hsh right-move key) right)
                ))
     hsh))
 
-(defun peek-move (starting-location move map)
-  (getmap map move starting-location))
-
-(defparameter *test-hsh* (make-hash-table :test #'equal))
+(defmacro peek-move (starting-location move map)
+  `(gethash (make-map-key ,move ,starting-location) ,map))
 
 (defun _search-locations
     (number-locations-searched pred map starting-locations visited-hsh)
@@ -117,34 +114,44 @@
     (remove-duplicates (mapcar #'remove-first-char keys)
                        :test #'equal)))
 
-(destructuring-bind ((movements) map-entry-strings) (lib:read-file-line-groups input)
-  (let ((map (lines->map-entries map-entry-strings)))
-    (let ((starting-locations (remove-if-not (lambda (loc)
-                                               (char= (elt loc (- (length loc) 1))
-                                                      #\A))
-                                             (all-map-locations map))))
+(defun string-ends-with-p (str char)
+  (char= (elt str (- (length str) 1))
+         char))
 
-    (search-max-depth-to-locations (lambda (loc)
-                                     (char= (elt loc (- (length loc) 1)) #\Z))
-                                   map
-                                   starting-locations))))
+;; subseq 4   = 1322249
+;; subseq 2 4 = 1024459
+;; subseq 0 2 = 992531
+;; subseq 0 3 = 46648957
+;;
+
+;; (require :sb-sprof)
+;; (sb-sprof:start-profiling)
 
 
-    ;; (format t "~5&STARTING LOOP!~2%" current-move current-location)
-    ;; (loop
-    ;;   with current-location = "AAA"
-    ;;   and current-move = (next moves)
-    ;;   until (string= "ZZZ" current-location)
-    ;;   count
-    ;;       (progn
-    ;;         (format t "~2&Next move: ~a, Current location: ~a~%" current-move current-location)
-    ;;         (let ((next-location (peek-move current-location current-move map))
-    ;;               (next-move (next moves)))
+(time (destructuring-bind ((movements) map-entry-strings) (lib:read-file-line-groups input)
+  (let ((map (lines->map-entries map-entry-strings))
+        (moves (make-instance 'circular-list :sequence movements)))
+    (let ((starting-locations (subseq (remove-if-not (lambda (loc)
+                                               (string-ends-with-p loc #\A))
+                                             (all-map-locations map)) 0 2)))
 
-    ;;           (format t "Starting at ~a moving to ~a (having moved ~a)~%"
-    ;;                   current-location
-    ;;                   next-location
-    ;;                   current-move)
+    (loop
+      with current-locations = starting-locations
+      and current-move = (next moves)
+      and n = 0
+      until (every (lambda (loc) (string-ends-with-p loc #\Z)) current-locations)
+      count
+          (progn
+            ;; (format t "~&Step: ~d~%" (incf n))
+            (let ((next-locations (mapcar (lambda (loc)
+                                            (peek-move loc current-move map))
+                                  current-locations))
+                  (next-move (next moves)))
 
-    ;;           (setf current-location next-location)
-    ;;           (setf current-move     next-move))))))
+              ;; (format t "~2&CURRENT: ~a~%NEXT: ~a~2%" current-locations next-locations)
+
+              (setf current-locations next-locations)
+              (setf current-move      next-move))))))))
+
+
+;; (sb-sprof:report :type :flat)
