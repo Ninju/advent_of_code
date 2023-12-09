@@ -22,7 +22,7 @@
 (defun last-element (lst)
   (car (last lst)))
 
-(defun last-element (lst)
+(defun first-element (lst)
   (car lst))
 
 (defun next-in-series (lst)
@@ -36,7 +36,7 @@
   (if (every #'zero-p lst)
       0
       (let ((diffs (differences lst)))
-        (+ (first-element lst)
+        (- (first-element lst)
            (prior-in-series diffs)))))
 
 
@@ -63,17 +63,13 @@
                    (lib:extract-numbers-from-line)
                    (next-in-series))))
 
-
- ; => 1930746032 (31 bits, #x7314D8B0)
-
-
 ;; PART 2
-(prior-in-series '(0 3 6 9 12 15 18))
 
-(prior-in-series '(1 3 6 10 15 21))
-(prior-in-series '(10 13 16 21 30 45))
+(defun part2 (filepath)
+  (loop for line in (lib:read-file-lines filepath)
+        sum
+        (arrows:-> line
+                   (lib:extract-numbers-from-line)
+                   (prior-in-series))))
 
-
-(prior-in-series '(0 3 6 9 12 15))
-(prior-in-series '(3 3 3 3 3))
-(prior-in-series '(0 0 0 0))
+(part2 input)
