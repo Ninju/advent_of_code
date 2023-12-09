@@ -81,13 +81,46 @@
 ;;    (alexandria:iota <length> :start <start> :step <step>)
 (defun gen-range (x0 x1) (loop for n from x0 to x1 collect n))
 
-(defun pairs (lst)
-  "(1 2 3 4) => ((1 2) (3 4))"
-  (loop for idx from 0 below (length lst) by 2
-        collect
-        (list (elt lst idx)
-              (elt lst (+ 1 idx)))))
+(defun pairs-n (n lst)
+  "Split list into consecutive element groups of size N.
 
+  Note: when N groups of equal size cannot be made, the remainder is returned
+        as a second value, but the elements of the remainder will not be in the
+        primary result
+
+        (pairs-n 2 '(1 2 3 4))
+        ;; => ((1 2) (3 4)), NIL
+
+        (pairs-n 3 '(1 2 3 4))
+        ;; => ((1 2 3)), (4)
+        ;; note: remainder is returned as second value
+
+  "
+  (if (= n 0)
+      (error "Cannot call pairs-n with ZERO")
+      (let ((remainder NIL)
+            (remainder-sym (gensym)))
+        (values
+         (loop for idx from 0 below (length lst) by n
+               collecting (handler-case
+                              (loop for i from 0 below n
+                                    collect
+                                    (elt lst (+ i idx)))
+                            (sb-kernel:index-too-large-error (c)
+                              (setf remainder (subseq lst idx))
+                              remainder-sym)) into matched-pairs
+               finally (return (remove-if (lambda (e) (equal e remainder-sym))
+                                          matched-pairs)))
+
+     remainder))))
+
+(defun pairs (lst)
+  "Split list into consecutive pairs of elements.
+
+   Different from #'consecutive as elements are not repeated in the returned
+   groups
+  "
+  (pairs-n 2 lst))
 
 (defun seq-intersection (seq-a seq-b)
   (remove-duplicates
