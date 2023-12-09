@@ -51,6 +51,32 @@
 
 ;; SEQUENCES
 
+(defun consecutive-n (n lst)
+  "Group consecutive N elements together
+
+       (consecutive-n 3 '(1 2 3 4))
+        ;; => '((1 2 3) (2 3 4))
+
+       (consecutive-n 1 '(1 2 3 4))
+        ;; => ((1) (2) (3) (4))
+
+       (consecutive-n 5 '(1 2 3 4))
+        ;; => NIL
+    "
+  (loop for idx from 0 to (- (length lst) n)
+        collect
+        (loop for i from 0 below n
+              collect
+              (elt lst (+ i idx)))))
+
+(defun consecutive (lst)
+  "Group consecutive elements together
+
+       (consecutive '(1 2 3))
+        ;; => '((1 2) (2 3))
+    "
+  (consecutive-n 2 lst))
+
 ;; OR (ql:quickload :alexandria)
 ;;    (alexandria:iota <length> :start <start> :step <step>)
 (defun gen-range (x0 x1) (loop for n from x0 to x1 collect n))
