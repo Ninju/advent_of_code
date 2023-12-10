@@ -35,12 +35,6 @@
 ;; ((2, 1) :rock)
 ;; ((0, 1) :rock)
 
-(format nil "~{~{~a~^ ~}~%~}"
-(let ((a (make-array '(7 4))))
-
-
-
-
 (defparameter rock-shapes-parser
   '("####")
 
@@ -111,5 +105,5 @@
         positions
         (flatten-removing-nils positions))))
 
-(grid-search *lines* #\* :keep-nils t)
-(grid-map (lib:read-file-lines input) (lambda (element) (equal element #\*)))
+;; (grid-search *lines* #\* :keep-nils t)
+;; (grid-map (lib:read-file-lines input) (lambda (element) (equal element #\*)))

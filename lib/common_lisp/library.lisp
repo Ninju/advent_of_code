@@ -3,6 +3,11 @@
 (ql:quickload :split-sequence)
 (ql:quickload "cl-ppcre")
 
+;; NUMBERs
+
+(defun zero-p (n)
+  (= n 0))
+
 ;; STRINGS (REGEX)
 (defun words (str &key (separator "\\s+"))
   (ppcre:split separator (string-trim " " str)))
@@ -50,6 +55,13 @@
   (reduce #'* numbers))
 
 ;; SEQUENCES
+
+(defun last-element (lst)
+  (car (last lst)))
+
+(defun first-element (lst)
+  (car lst))
+
 
 (defun consecutive-n (n lst)
   "Group consecutive N elements together
@@ -178,8 +190,6 @@
            (unless (integerp dim) (error "Dimensions must be integers: ~S" dim)))
          (destructuring-bind ,(reverse dims-rev) ,dims ; Dimensions reversed so that innermost is last
            ,result)))))
-
-
 
 (defun max-width (list-of-lists)
   (reduce #'max list-of-lists :key #'length))

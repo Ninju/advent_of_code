@@ -24,4 +24,6 @@
    ;; 2D ARRAYS
    :print-array-contents
    :lists->2d-array
-   :get-column))
+   :get-column
+   :max-width
+   :grid-adjacent-points-to))
