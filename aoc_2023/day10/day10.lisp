@@ -165,66 +165,6 @@
 (defun last-element (lst)
   (car (last lst)))
 
-(defun backtrack (current-position current-path)
-  (format t "~&- Backtracking from ~a and path is ~a"
-          current-position current-path)
-  (if (not (cdr current-path)) ;; there's nowhere left to go
-      NIL
-      (search-loop (car current-path) ;; search from previous position
-                   (cdr current-path))))
-
-(defun search-loop (current-position current-path)
-  (if (not (visited-p current-position))
-      (format t "~&+ Searching ~a , path = ~a~%"
-              current-position current-path))
-  (mark-visited! current-position)
-
-  (let ((neighbouring-connections (get-connected-neighbours current-position)))
-    (if (not (= 2 (length neighbouring-connections)))
-        (backtrack current-position current-path)
-        (let* ((next-connections (prog1 (remove-visited neighbouring-connections)
-                                   (format t "~&      Neighbouring connections = ~a" neighbouring-connections)))
-               (next-position (car next-connections)))
-          (if (not next-position)
-              ;; check to see if we've landed back at the starting position
-              (progn
-                (format t "~&        Last element in path: ~a" (last-element current-path))
-                (format t "~&        IN neighbouring connections? ~a" (last-element current-path))
-                (if (find (last-element current-path) neighbouring-connections :test #'equal)
-                    (prog1 (cons current-position current-path)
-                      (format t "~&!!!!! Back at the start! Current path = ~a" (cons current-position current-path)))
-
-                    ;; otherwise we've hit a deadend
-                    (backtrack current-position current-path)))
-
-              (search-loop next-position (cons current-position current-path)))))))
-
-(defun find-loop ()
-  (format t "~5&------ STARTING LOOP SEARCH -----~%")
-  (let ((start-pos (find-starting-position)))
-    (clear-visited!)
-    (let ((result (search-loop start-pos '())))
-      (format t "~2&______ END OF SEARCH ______~%")
-      result)))
-
-(let ((*map* (build-map *example-2-input*)))
-  (find-loop))
-
-;; (let ((result (loop for line in (lib:read-file-lines *example-input*)
-;;                     collect
-;;                     (arrows:->> line
-
-;;                                ;; PARSE LINE INPUT
-
-;;                                ;; RUN PROCESSING FUNCTION
-
-;;                                ))))
-
-;;   ;; RUN AGGREGATION, if necessary
-;;   (let ((final-result (agg result)))
-;;     (format t "The result is: ~A" final-result)
-;;     final-result))
-
 (defun get-neighbours (pos)
   (remove-if #'out-of-bounds-p (apply-directions pos *default-directions*)))
 
@@ -257,11 +197,77 @@
           (funcall predicate y1 y2)
           (funcall predicate x1 x2)))))
 
+(defun backtrack (current-position current-path)
+  ;; (format t "~&- Backtracking from ~a and path is ~a"
+  ;;         current-position current-path)
+  (if (not (cdr current-path)) ;; there's nowhere left to go
+      NIL
+      (search-loop (car current-path) ;; search from previous position
+                   (cdr current-path))))
+
+(defun search-loop (current-position current-path)
+  ;; (if (not (visited-p current-position))
+  ;;     (format t "~&+ Searching ~a , path = ~a~%"
+  ;;             current-position current-path))
+  (mark-visited! current-position)
+
+  (let ((neighbouring-connections (get-connected-neighbours current-position)))
+    (if (not (= 2 (length neighbouring-connections)))
+        (backtrack current-position current-path)
+        (let* ((next-connections (remove-visited neighbouring-connections))
+               (next-position (car next-connections)))
+          (if (not next-position)
+              ;; check to see if we've landed back at the starting position
+              (progn
+                ;; (format t "~&        Last element in path: ~a" (last-element current-path))
+                ;; (format t "~&        IN neighbouring connections? ~a" (last-element current-path))
+                (if (find (last-element current-path) neighbouring-connections :test #'equal)
+                    (cons current-position current-path)
+                    ;;  (format t "~&!!!!! Back at the start! Current path = ~a" (cons current-position current-path)))
+
+                    ;; otherwise we've hit a deadend
+                    (backtrack current-position current-path)))
+
+              (search-loop next-position (cons current-position current-path)))))))
+
+(defun find-loop ()
+  (format t "~5&------ STARTING LOOP SEARCH -----~%")
+  (let ((start-pos (find-starting-position)))
+    (clear-visited!)
+    (let ((result (search-loop start-pos '())))
+      (format t "~2&______ END OF SEARCH ______~%")
+      result)))
+
+(defun main ()
+  (let ((*map* (build-map *input*)))
+    (let* ((path (find-loop))
+           (result (/ (length path) 2)))
+      (format t "~5&The result is: ~a" result)))
+  )
+
+(main)
+
+
+;; (let ((result (loop for line in (lib:read-file-lines *example-input*)
+;;                     collect
+;;                     (arrows:->> line
+
+;;                                ;; PARSE LINE INPUT
+
+;;                                ;; RUN PROCESSING FUNCTION
+
+;;                                ))))
+
+;;   ;; RUN AGGREGATION, if necessary
+;;   (let ((final-result (agg result)))
+;;     (format t "The result is: ~A" final-result)
+;;     final-result))
+
+;; TESTS
 (defun seq-points= (seq1 seq2)
   (equal (sort seq1 #'sort-points)
          (sort seq2 #'sort-points)))
 
-;; TESTS
 (fiveam:def-suite day-test-suite
   :description "Test functions needed to complete the puzzle")
 
