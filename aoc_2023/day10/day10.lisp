@@ -1,22 +1,9 @@
 (in-package :aoc_2023)
 
 (ql:quickload :split-sequence)
-(ql:quickload :fiveam)
 (ql:quickload :cl-ppcre)
 (ql:quickload :alexandria)
 (ql:quickload :arrows)
-
-;; TEMP: REFERENCE CODE
-;; (defclass class-name (standard-object)
-;;   ((slot1
-;;     :initarg slot1
-;;     :initform 0
-;;     :reader slot1)
-;;    (slot2
-;;     :initarg slot2
-;;     :initform 0
-;;     :reader slot2)))
-
 
 (defparameter *day-number* 10)
 
@@ -36,7 +23,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun get-pathname (filename)
     (arrows:-> filename
-               (merge-pathnames (format nil "day~d/" *day-number*))
+               (merge-pathnames (format nil "day~d/inputs/" *day-number*))
                (merge-pathnames #p"/home/alex/src/workspace/advent_of_code/aoc_2023/"))))
 
 (defparameter *example-1-input* (get-pathname "example_1.txt"))
@@ -241,8 +228,6 @@
 (defun empty-p (lst)
   (equal (car lst) '()))
 
-
-
 (defun unenclosed-area-search (start-pos path visited-marker current-path)
   (format t "+ Searching ~a with current path as ~a" start-pos current-path)
   (setf (gethash start-pos visited-marker) T)
@@ -276,176 +261,3 @@
                           '()))
 
 
-;; PART 2
-;; (let ((*map* (build-map *example-1-input*))
-;;       (path '((2 1) (3 1) (3 2) (3 3) (2 3) (1 3) (1 2) (1 1))))
-;;   (arrows:->> (get-neighbours '(0 0))
-;;               (remove-if (lambda (n) (find n path :test #'equal)))
-;;               (car)
-;;               (get-neighbours)
-;;               (cadr)
-;;               (get-neighbours)
-;;               (cadr)
-;;               (get-neighbours)))
-
-
-
-
-(defun main ()
-  (let ((*map* (build-map *example-1-input*)))
-    (let* ((path (find-loop)))
-      path))
-
-
-           (area (find-area-outside-path path)))
-      (format t "~5&The result is: ~a" result)
-      (destructuring-bind (w h) (array-dimensions *map*)
-        (loop for y from 0 below h
-              do
-                 (format t "~&")
-                 (loop for x from 0 below w
-                       do
-                          (format t "~a"
-                                  (if (find (list x y) path :test #'equal)
-                                      "X"
-                                      (if (find (list x y) area :test #'equal)
-                                          "o"
-                                          ".")))))))))
-
-(main)
-
-
-;; (let ((result (loop for line in (lib:read-file-lines *example-input*)
-;;                     collect
-;;                     (arrows:->> line
-
-;;                                ;; PARSE LINE INPUT
-
-;;                                ;; RUN PROCESSING FUNCTION
-
-;;                                ))))
-
-;;   ;; RUN AGGREGATION, if necessary
-;;   (let ((final-result (agg result)))
-;;     (format t "The result is: ~A" final-result)
-;;     final-result))
-
-;; TESTS
-(defun seq-points= (seq1 seq2)
-  (equal (sort seq1 #'sort-points)
-         (sort seq2 #'sort-points)))
-
-(fiveam:def-suite day-test-suite
-  :description "Test functions needed to complete the puzzle")
-
-(fiveam:in-suite day-test-suite)
-
-(fiveam:test all-tests-go-here-to-start
-  (fiveam:is (equal '(1 0) (reverse-direction '(-1 0))))
-  (fiveam:is (equal (apply-directions '(3 3) '((1 0) (-1 0)))
-                    '((4 3) (2 3))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (equal '(0 2)
-                      (find-starting-position))))
-
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (equal '(1 1)
-                      (find-starting-position)))))
-
-(fiveam:run! 'all-tests-go-here-to-start)
-
-
-(fiveam:test test-fn-direction-from
-  (fiveam:is (equal '(-1 0) (direction-from '(3 4) '(2 4))))
-  (fiveam:is (equal '(2 0) (direction-from '(0 4) '(2 4)))))
-
-(fiveam:run! 'test-fn-direction-from)
-
-
-
-(fiveam:test testing-fn-connects-to-p-starting-position-to-point
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (connects-to-p '(1 1) '(2 1)))
-    (fiveam:is (connects-to-p '(1 1) '(1 2)))
-
-    (fiveam:is-false (connects-to-p '(1 1) '(0 0)))
-    (fiveam:is-false (connects-to-p '(1 1) '(0 1))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (connects-to-p '(0 2) '(1 2)))
-    (fiveam:is (connects-to-p '(0 2) '(0 3)))))
-
-(fiveam:run! 'testing-fn-connects-to-p-starting-position-to-point)
-
-(fiveam:test testing-fn-connects-to-p-from-pipe-to-pipe
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (connects-to-p '(3 3) '(2 3)))
-    (fiveam:is (connects-to-p '(3 2) '(3 1))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (connects-to-p '(0 4) '(1 4)))
-    (fiveam:is (connects-to-p '(0 4) '(0 3)))
-
-    (fiveam:is-false (connects-to-p '(0 3) '(1 3)))
-    (fiveam:is-false (connects-to-p '(1 3) '(0 3)))))
-
-(fiveam:run! 'testing-fn-connects-to-p-from-pipe-to-pipe)
-
-(fiveam:test testing-fn-get-connected-neighbours-from-starting-position
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (seq-points= (get-connected-neighbours '(1 1))
-                      '((1 2) '(2 1)))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (seq-points= (get-connected-neighbours '(0 2))
-                      '((0 3) (1 2))))))
-
-(fiveam:test testing-fn-get-connected-neighbours-from-starting-position
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (seq-points= '((2 1) (1 2))
-                            (get-connected-neighbours (find-starting-position)))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (seq-points= '((0 3) (1 2))
-                            (get-connected-neighbours (find-starting-position))))))
-
-(fiveam:run! 'testing-fn-get-connected-neighbours-from-starting-position)
-
-
-(let ((*map* (build-map *example-2-input*)))
-  (remove-if-not #'pipe-pos (get-neighbours (find-starting-position))))
-
-(fiveam:test testing-fn-get-connected-neighbours-from-pipe-to-starting-position
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (seq-points= (get-connected-neighbours '(2 1))
-                      '((1 1) (3 1))))
-    (fiveam:is (seq-points= (get-connected-neighbours '(1 2))
-                      '((1 1) (1 3)))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (seq-points= (get-connected-neighbours '(1 2))
-                      '((0 2) (1 1))))
-    (fiveam:is (seq-points= (get-connected-neighbours '(0 3))
-                      '((0 2) (0 4))))))
-
-(fiveam:run! 'testing-fn-get-connected-neighbours-from-pipe-to-starting-position)
-
-(fiveam:test testing-fn-get-connected-neighbours-from-pipe-to-pipe
-  (let ((*map* (build-map *example-1-input*)))
-    (fiveam:is (seq-points= (get-connected-neighbours '(2 3))
-                      '((3 3) (1 3))))
-    (fiveam:is (seq-points= (get-connected-neighbours '(1 3))
-                      '((2 3) (1 2))))
-    (fiveam:is (seq-points= (get-connected-neighbours '(3 1))
-                      '((2 1) (3 2)))))
-
-  (let ((*map* (build-map *example-2-input*)))
-    (fiveam:is (seq-points= (get-connected-neighbours '(1 1))
-                      '((2 1) (1 2))))
-    (fiveam:is (seq-points= (get-connected-neighbours '(1 3))
-                      '((1 4) (2 3))))))
-
-(fiveam:run! 'testing-fn-get-connected-neighbours-from-pipe-to-pipe)
-
-(fiveam:run! 'day-test-suite)
