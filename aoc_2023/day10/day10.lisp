@@ -238,12 +238,79 @@
       (format t "~2&______ END OF SEARCH ______~%")
       result)))
 
+(defun empty-p (lst)
+  (equal (car lst) '()))
+
+
+
+(defun unenclosed-area-search (start-pos path visited-marker current-path)
+  (format t "+ Searching ~a with current path as ~a" start-pos current-path)
+  (setf (gethash start-pos visited-marker) T)
+  (let* ((neighbours (get-neighbours start-pos))
+         (non-path-neighbours (remove-if
+                               (lambda (n) (find n path :test #'equal))
+                               neighbours))
+         (unvisited-neighbours (remove-if
+                                (lambda (n) (gethash n visited-marker))
+                                non-path-neighbours)))
+    (if (empty-p unvisited-neighbours)
+        (if (not path)
+            (alexandria:hash-table-keys visited-marker)
+            (progn
+              (format t "- Backtracking to ~a" (car current-path))
+              (unenclosed-area-search (car current-path)
+                                    path
+                                    visited-marker
+                                    (cdr current-path))))
+        (unenclosed-area-search (car neighbours)
+                                path
+                                visited-marker
+                                (cons start-pos current-path)))))
+
+
+
+(defun find-area-outside-path (path)
+  (unenclosed-area-search '(0 0)
+                          path
+                          (make-hash-table :test #'equal)
+                          '()))
+
+
+;; PART 2
+;; (let ((*map* (build-map *example-1-input*))
+;;       (path '((2 1) (3 1) (3 2) (3 3) (2 3) (1 3) (1 2) (1 1))))
+;;   (arrows:->> (get-neighbours '(0 0))
+;;               (remove-if (lambda (n) (find n path :test #'equal)))
+;;               (car)
+;;               (get-neighbours)
+;;               (cadr)
+;;               (get-neighbours)
+;;               (cadr)
+;;               (get-neighbours)))
+
+
+
+
 (defun main ()
-  (let ((*map* (build-map *input*)))
-    (let* ((path (find-loop))
-           (result (/ (length path) 2)))
-      (format t "~5&The result is: ~a" result)))
-  )
+  (let ((*map* (build-map *example-1-input*)))
+    (let* ((path (find-loop)))
+      path))
+
+
+           (area (find-area-outside-path path)))
+      (format t "~5&The result is: ~a" result)
+      (destructuring-bind (w h) (array-dimensions *map*)
+        (loop for y from 0 below h
+              do
+                 (format t "~&")
+                 (loop for x from 0 below w
+                       do
+                          (format t "~a"
+                                  (if (find (list x y) path :test #'equal)
+                                      "X"
+                                      (if (find (list x y) area :test #'equal)
+                                          "o"
+                                          ".")))))))))
 
 (main)
 
