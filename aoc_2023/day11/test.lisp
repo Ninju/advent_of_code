@@ -37,5 +37,4 @@
                     (convert-universe-to-2d-array
                      (expand-universe *fixture-example*)))))
 
-
 (fiveam:run! 'expanded-universe)
