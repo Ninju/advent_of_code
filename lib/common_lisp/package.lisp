@@ -16,6 +16,7 @@
    :seq-intersection
    :pairs
    :gen-range
+   :consecutive
 
    ;; FILE READING
    :read-file-lines
