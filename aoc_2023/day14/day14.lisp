@@ -173,20 +173,154 @@
 (defun number-of-rows-pair-between (rows pair)
   (number-of-intersects-between-positions rows pair #'between-row))
 
-(let ((lines (lib:read-file-lines (get-inputs-pathname "input.txt"))))
-  (let ((map-height (length lines))
-        (column-limits (make-list (length (car lines)) :initial-element 0))
-        (total-load 0))
-    (loop for line in lines
-          and row from 1
+(defun list-of-strings->columns (list-of-strings)
+  (apply #'map 'list  (lambda (&rest rest)
+                        (coerce rest 'string))
+         list-of-strings))
+
+(defun rotate-clockwise (list-of-strings)
+  (apply #'map 'list  (lambda (&rest rest)
+                        (reverse (coerce rest 'string)))
+         list-of-strings))
+
+(defun rotate-anti-clockwise (list-of-strings)
+  (reverse (apply #'map 'list  (lambda (&rest rest)
+                                 (coerce rest 'string))
+                  list-of-strings)))
+
+(defun rotate-n (list-of-strings n rotate-fn)
+  (if (<= n 0)
+      list-of-strings
+      (rotate-n (funcall rotate-fn list-of-strings) (- n 1) rotate-fn)))
+
+(defun rotate-anti-clockwise-n (list-of-strings n)
+  (rotate-n list-of-strings n #'rotate-anti-clockwise))
+
+(defun rotate-clockwise-n (list-of-strings n)
+  (rotate-n list-of-strings n #'rotate-clockwise))
+
+(defun update-sliding-rock-position (row col new-row lines)
+  (let ((old-line (elt lines (- row 1))))
+  (setf (elt old-line col) #\.))
+
+  (setf (elt (elt lines (- new-row 1)) col)
+        +sliding-rock-char+))
+
+(defun rotation-factor (direction)
+  (case direction
+    (:north 0)
+    (:west  1)
+    (:south 2)
+    (:east  3)))
+
+(defun tilt (direction map)
+  (let ((rotation-factor (rotation-factor direction)))
+    (let ((lines (rotate-clockwise-n map rotation-factor)))
+      (let ((map-height (length lines))
+            (column-limits (make-list (length (car lines)) :initial-element 0)))
+        (loop for line in lines
+              and row from 1
+              do
+                 (loop for c across line
+                       and col from 0
+                       do
+                          (if (unmoveable-rock-p c)
+                              (setf (elt column-limits col) row)
+                              (if (sliding-rock-p c)
+                                  (let ((column-limit (elt column-limits col)))
+                                    (setf (elt column-limits col) (+ 1 column-limit))
+                                    (update-sliding-rock-position row
+                                                                  col
+                                                                  (+ 1 column-limit)
+                                                                  lines)
+                                    )))))
+        (rotate-anti-clockwise-n lines rotation-factor)))))
+
+(defun cycle (map)
+  (->> map
+       (tilt :north)
+       (tilt :west)
+       (tilt :south)
+       (tilt :east)))
+
+(defun copy-map (map) (mapcar #'copy-seq map))
+
+(defun cycle-until-loop (map steps previous-maps limit)
+  (if (>= steps limit)
+      NIL
+      (let ((old-map (copy-map map))
+            (new-map (cycle map)))
+        (let ((new-previous-maps (cons old-map previous-maps)))
+          (let ((pos (find new-map new-previous-maps :test #'equal)))
+            (if pos
+              (values (+ 1 steps) pos)
+              (cycle-until-loop new-map
+                                (+ 1 steps)
+                                new-previous-maps
+                                limit)))))))
+
+
+(defun _cycle-until-converges (map iteration-limit num-previous-steps)
+  (multiple-value-bind (steps new-map) (cycle-until-loop map
+                                                         0
+                                                         '()
+                                                         iteration-limit)
+    (if (not (car num-previous-steps))
+        (_cycle-until-converges new-map
+                               iteration-limit
+                               (cons steps num-previous-steps))
+        (if (= (car num-previous-steps) steps)
+            (values (cons steps num-previous-steps)
+                    new-map)
+            (_cycle-until-converges new-map
+                                    iteration-limit
+                                    (cons steps num-previous-steps))))))
+
+
+(defun cycle-until-converges (map iteration-limit)
+  (_cycle-until-converges map iteration-limit '()))
+
+
+(defun cycle-n (n init)
+  (if (<= n 0)
+      init
+      (cycle-n (- n 1)
+               (cycle init))))
+
+(defun measure-northern-load (map)
+  (let ((total-load 0)
+        (map-height (length map)))
+    (loop for line in map
+          and row from 0
           do
              (loop for c across line
                    and col from 0
                    do
-                      (if (unmoveable-rock-p c)
-                          (setf (elt column-limits col) row)
-                          (if (sliding-rock-p c)
-                              (let ((column-limit (elt column-limits col)))
-                                (incf total-load (- map-height column-limit))
-                                (setf (elt column-limits col) (+ 1 column-limit)))))))
+                      (if (sliding-rock-p c)
+                          (incf total-load (- map-height row)))))
     total-load))
+
+(defun print-map (map)
+  (format nil "~2&~{~&~A~}~%" map))
+
+
+(defun loop-finder (map)
+  (multiple-value-bind (convergence-points new-map) (cycle-until-converges map 1000)
+    (let ((loop-size (car convergence-points))
+          (loop-first-detected-at (last-element convergence-points)))
+      (list loop-size loop-first-detected-at))))
+
+
+(defun part2 (map)
+  (let* ((num-cycles 1000000000)
+         (convergence-points (cycle-until-converges map
+                                                    1000))
+         (loop-size (car convergence-points))
+         (loop-first-detected-at (last-element convergence-points)))
+
+    (let ((equivalent-cycles (+ loop-first-detected-at
+                                (mod (- num-cycles loop-first-detected-at)
+                                     loop-size))))
+      (measure-northern-load (cycle-n equivalent-cycles map)))))
+
+(part2 (lib:read-file-lines (get-inputs-pathname "input.txt")))
