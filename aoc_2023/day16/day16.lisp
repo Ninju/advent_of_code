@@ -191,18 +191,55 @@
          (if (not photons)
              (return energized-tiles-log)))))
 
-(defun count-energized-tiles (filename starting-position starting-direction)
-  (let ((map (build-map filename)))
-    (let ((initial-light (make-photon starting-direction
-                                      starting-position)))
+(defun count-energized-tiles (map starting-position starting-direction)
+  (let ((initial-light (make-photon starting-direction
+                                    starting-position)))
 
-      (->> (main-loop map (list initial-light))
-           (alexandria:hash-table-keys)
-           (length)))))
+    (->> (main-loop map (list initial-light))
+         (alexandria:hash-table-keys)
+         (length))))
+
+(defun count-energized-tiles-from-file (filename starting-position starting-direction)
+  (let ((map (build-map filename)))
+    (count-energized-tiles map starting-position starting-direction)))
 
 (defun part1 (filename)
-  (count-energized-tiles filename (make-pos -1 0) *east*))
+  (count-energized-tiles-from-file filename (make-pos -1 0) *east*))
 
-(part1 "example.txt")
+(defun part2 (filename)
+  (let ((map (build-map filename)))
+    (destructuring-bind (h w) (array-dimensions map)
+      (let ((y-range (lib:gen-range 0 (- h 1)))
+            (x-range (lib:gen-range 0 (- w 1))))
+        (let ((north-side (mapcar (lambda (x) (make-pos x -1))
+                                  x-range))
 
-(part1 "input.txt")
+              (south-side (mapcar (lambda (x) (make-pos x h))
+                                  x-range))
+
+              (west-side (mapcar (lambda (y) (make-pos -1 y))
+                                  y-range))
+
+              (east-side (mapcar (lambda (y) (make-pos w y))
+                                  y-range)))
+
+          (loop for (x y) in (nconc north-side
+                                    south-side
+                                    west-side
+                                    east-side)
+                maximizing
+                (count-energized-tiles map
+                                       (make-pos x y)
+                                       (make-pos (cond
+                                                   ((<  x 0)  1)
+                                                   ((>= x w) -1)
+                                                   (t         0))
+                                                 (cond
+                                                   ((<  y 0)  1)
+                                                   ((>= y h) -1)
+                                                   (t         0))))))))))
+
+(part2 "input.txt")
+
+
+(part2 "example.txt")
