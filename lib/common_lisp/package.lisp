@@ -14,9 +14,10 @@
    :split-by
    :sum
    :seq-intersection
-   :pairs
+   :pairs-n
    :gen-range
    :consecutive
+   :consecutive-n
 
    ;; FILE READING
    :read-file-lines
