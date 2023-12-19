@@ -159,23 +159,66 @@
                                                  acc-fn
                                                  acc))))))
 
+(defun flatten (list-of-lists)
+  (reduce #'nconc list-of-lists))
+
 (defun lazy-node-paths (lazy-node)
   (if (not lazy-node)
-      NIL
+      '(())
       (let ((current-node-val (lazy-node-value lazy-node))
             (lhs (left-get lazy-node))
             (rhs (right-get lazy-node)))
 
-        (if (and (not lhs)
-                 (not rhs))
-            (list current-node-val)
-            (mapcar (lambda (p)
-                      (cons current-node-val p))
-                    (nconc (lazy-node-paths lhs)
-                           (lazy-node-paths rhs)))))))
+        (mapcar (lambda (p) (cons current-node-val p))
+                (concatenate 'list
+                             (lazy-node-paths lhs)
+                             (lazy-node-paths rhs))))))
 
+(defun lazy-node->list (lazy-node)
+  (if (not lazy-node)
+      '()
+      (let ((current-node-val (lazy-node-value lazy-node))
+            (lhs (left-get lazy-node))
+            (rhs (right-get lazy-node)))
+
+        (cons current-node-val
+              (list (lazy-node->list lhs)
+                    (lazy-node->list rhs))))))
+
+(tree->paths
+ (lazy-node->list  (build-lazy-spring-tree "abc??def"))
+
+ )
+
+ ; => (("abc" ("#" "#def") ("#" ".def")) ("abc" ("." "#def") ("." ".def")))
+ ;
 (lazy-node-paths *test-tree*)
-(lazy-node-paths (build-lazy-spring-tree "abc??def"))
+
+
+(defun empty-node-p (tree) (not (car tree)))
+(defun non-empty-child-nodes (tree) (remove-if #'empty-node-p (cdr tree)))
+(defun node-has-children-p (tree) (> (length (non-empty-child-nodes tree)) 0))
+(defun leaf-node-p (tree) (and (car tree) (not (node-has-children-p tree))))
+
+(defun tree->paths (tree)
+  (if (not tree)
+      '()
+      (let ((head (car tree)))
+
+        (if (leaf-node-p tree)
+            (list head)
+
+            (let* ((children (non-empty-child-nodes tree))
+                   (child-paths (mapcar #'tree->paths children)))
+              (if (not children)
+                  (list head)
+                  (mapcar (lambda (p) (cons head p)) child-paths)))))))
+
+(mapcar (lambda (xs)
+          (format nil "~{~A~}" xs))
+        (lazy-node-paths (build-lazy-spring-tree "abc??def")))
+(lazy-node->list  (build-lazy-spring-tree "abc??def"))
+
 
 (defparameter *test-tree* (make-lazy-node NIL
                                           "abc"
