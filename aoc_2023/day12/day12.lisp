@@ -49,6 +49,18 @@
 (defun damaged-components (spring)
   (ppcre:all-matches-as-strings *damaged-spring-regex* spring))
 
+(defun node-value (node) (car node))
+
+(defun get-child (child-id node)
+  (cond
+    ((eql child-id :left) (get-left node))
+    ((eql child-id :right) (get-right node))))
+
+(defun get-child-with-leading-char (c node)
+  (cond
+    ((char= c +damaged-spring-char+) (get-left node))
+    ((char= c +operational-spring-char+) (get-right node))))
+
 (defun arrangement-satisfies-counts-p (arrangement counts)
   (equal counts
          (mapcar #'length
@@ -205,31 +217,10 @@
 (defparameter *rec* '())
 (defun rec (x) (progn (push (node-value x) *rec*) x))
 
-(setf *rec* '())
-(->>
-     (build-damaged-spring-search-tree "#?.?#..")
-     (rec)
-     (get-child :left)
-     (rec)
-     (get-child :left)
-     (rec)
-     (get-child :right)
-     (rec))
-
 (defun build-tree (input)
   (destructuring-bind (spring counts) input
       (list (build-damaged-spring-search-tree spring)
             counts)))
-
-(defun get-child (child-id node)
-  (cond
-    ((eql child-id :left) (get-left node))
-    ((eql child-id :right) (get-right node))))
-
-(defun get-child-with-leading-char (c node)
-  (cond
-    ((char= c +damaged-spring-char+) (get-left node))
-    ((char= c +operational-spring-char+) (get-right node))))
 
 (define-condition invalid-arrangement-due-to-mismatched-counts (error)
   ((arrangement :initarg arrangement)
@@ -273,8 +264,6 @@
               ((= consumed count) (consume-counts unconsumed-spring
                                                   (cdr counts)))))))))
 
-(defun node-value (node)
-  (car node))
 
 (define-condition result-found (condition)
   ((result :initarg :result
@@ -319,25 +308,6 @@
                                                   counts
                                                   current-arrangement))
                               (format t "~&---- ALL DECISIONS MADE")))))))
-
-(defun mid-level
-    ()
-  (handler-bind ((result-found (lambda (c)
-                                 (print (get-result c)))))
-    (loop for n from 0 upto 100
-          do
-             (if (= 0 (mod n 7))
-                 (progn (signal 'result-found :result n))))))
-
-(defun top-level ()
-
-  (let ((results '()))
-    (handler-bind ((result-found (lambda (c)
-                                   (push (get-result c) results))))
-      (mid-level))
-    results))
-
-(top-level)
 
 (defun branch-into (char node counts current-arrangement)
   (let ((child (get-child-with-leading-char char node))
@@ -412,9 +382,11 @@
     (search-all-arrangements tree counts)))
 
  ; => ("???.###" (1 1 3))
+;; (->> (part1 "example.txt") (mapcar #'explode-input) (car))
 
+ ; => ("???.###?.???.###?.???.###?.???.###?.???.###" (1 1 3 1 1 3 1 1 3 1 1 3 1 1 3))
 ;; (let ((arrangements (->> (part1 "example.txt")
-;;                          ;; (mapcar #'explode-input)
+;;                          (mapcar #'explode-input))
 ;;                          (mapcar #'build-tree)
 ;;                          (mapcar #'arrangements-for-input))))
 ;;   arrangements)
@@ -423,7 +395,7 @@
 
 ;; (step-through-node (build-damaged-spring-search-tree "?") '(1) "")
 
-(search-all-arrangements (build-damaged-spring-search-tree "??????") '(1 1)) ;; '("..")
+;; (search-all-arrangements (build-damaged-spring-search-tree "??????") '(1 1)) ;; '("..")
 
 ;; (node-value (build-damaged-spring-search-tree "?")
 

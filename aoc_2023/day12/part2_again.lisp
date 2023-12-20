@@ -97,13 +97,19 @@
 (defun empty-char-p (str cursor)
   (char= #\. (elt str cursor)))
 
+(defun count-possible-max-count (spring)
+  (let ((matches (ppcre:all-matches-as-strings "[\\?#]" spring)))
+    (if matches
+        (length matches)
+        0)))
+
 (defun search-arrangements (str cursor counts unvisited cur acc)
   (cond
     ;; CHECK: at end of string?
     ((>= cursor (length str))
      (if (counts-remaining-p counts)
          (search-from-next-unvisited str unvisited acc)
-         (search-from-next-unvisited str unvisited (cons cur acc))))
+         (search-from-next-unvisited str unvisited (+ 1 acc))))
 
     ;; CHECK: already consumed counts but have more '#'
     ((and (counts-empty-p counts)
@@ -113,70 +119,64 @@
     ((counts-empty-p counts)
      (search-from-next-unvisited str
                                  unvisited
-                                 (cons
-                                  (format nil "~A~A"
-                                          (subseq str 0 cursor)
-                                          (ppcre:regex-replace-all "\\?"
-                                                                   (subseq str cursor)
-                                                                   "."))
-                                  acc)))
+                                 (+ 1 acc)))
     ((> (lib:sum counts)
-        (or (ppcre:all-matches-as-strings "[\\?#]" (subseq str cursor)) 0))
+        (count-possible-max-count (subseq str cursor)))
      (search-from-next-unvisited str
                                  unvisited
                                  acc))
 
-  ;; CHECK: just finished consuming, next char must be a dot '.'
-  ((and (counts-just-fully-consumed-p counts)
-        (damaged-char-p str cursor))
-   (search-from-next-unvisited str unvisited acc))
+    ;; CHECK: just finished consuming, next char must be a dot '.'
+    ((and (counts-just-fully-consumed-p counts)
+          (damaged-char-p str cursor))
+     (search-from-next-unvisited str unvisited acc))
 
-  ((and (counts-just-fully-consumed-p counts)
-        (or
-         (empty-char-p str cursor)
-         (unknown-char-p str cursor)))
-   (continue-search-arrangements #\. str cursor (cdr counts) unvisited cur acc))
+    ((and (counts-just-fully-consumed-p counts)
+          (or
+           (empty-char-p str cursor)
+           (unknown-char-p str cursor)))
+     (continue-search-arrangements #\. str cursor (cdr counts) unvisited cur acc))
 
-  ;; CHECK: previous char was '#' and we have counts to consume, then current
-  ;;        char must be '#'
-  ((and (counts-remaining-p counts)
-        (char= #\# (safe-previous-char str cursor))
-        (or (damaged-char-p str cursor)
-            (unknown-char-p str cursor)))
+    ;; CHECK: previous char was '#' and we have counts to consume, then current
+    ;;        char must be '#'
+    ((and (counts-remaining-p counts)
+          (char= #\# (safe-previous-char str cursor))
+          (or (damaged-char-p str cursor)
+              (unknown-char-p str cursor)))
 
-   (continue-search-arrangements #\#
-                                 str
-                                 cursor
-                                 (consume-counts counts 1)
-                                 unvisited
-                                 cur
-                                 acc))
+     (continue-search-arrangements #\#
+                                   str
+                                   cursor
+                                   (consume-counts counts 1)
+                                   unvisited
+                                   cur
+                                   acc))
 
-  ((and (counts-remaining-p counts)
-        (char= #\# (safe-previous-char str cursor))
-        (empty-char-p str cursor))
-   (search-from-next-unvisited str unvisited acc))
+    ((and (counts-remaining-p counts)
+          (char= #\# (safe-previous-char str cursor))
+          (empty-char-p str cursor))
+     (search-from-next-unvisited str unvisited acc))
 
-  ((or (damaged-char-p str cursor)
-       (empty-char-p str cursor))
+    ((or (damaged-char-p str cursor)
+         (empty-char-p str cursor))
 
-      (continue-search-arrangements (elt str cursor)
-                                    str
-                                    cursor
-                                    (consume-counts-with-char counts
-                                                              (elt str cursor))
-                                    unvisited
-                                    cur
-                                    acc))
+     (continue-search-arrangements (elt str cursor)
+                                   str
+                                   cursor
+                                   (consume-counts-with-char counts
+                                                             (elt str cursor))
+                                   unvisited
+                                   cur
+                                   acc))
 
-     ((unknown-char-p str cursor)
-      (branch-search-arrangements str cursor counts unvisited cur acc))
+    ((unknown-char-p str cursor)
+     (branch-search-arrangements str cursor counts unvisited cur acc))
 
-     (t (error "Non-exhaustive search for string"))))
+    (t (error "Non-exhaustive search for string"))))
 
 
 (defun search-all-arrangements (str counts)
-  (search-arrangements str 0 counts '() "" '()))
+  (search-arrangements str 0 counts '() "" 0))
 
 (defun repeat (times lst)
   (let ((result '()))
@@ -199,9 +199,9 @@
   (mapcar #'parse-integer (ppcre:split *count-separator-regex* str)))
 
 (defun parse-input-line (line)
-       (destructuring-bind (spring counts-str)
-           (ppcre:split *whitespace-regex* line)
-         (list spring (parse-counts-string counts-str))))
+  (destructuring-bind (spring counts-str)
+      (ppcre:split *whitespace-regex* line)
+    (list spring (parse-counts-string counts-str))))
 
 (defun load-exploded-input (filename)
   (->> (lib:read-file-lines (get-inputs-pathname filename))
@@ -217,15 +217,15 @@
         (load-exploded-input "example.txt")
         :key (lambda (input)
                (destructuring-bind (str counts) input
-                   (search-all-arrangements str counts))))
+                 (search-all-arrangements str counts))))
 
 ;; Exploded test input
 
 #+nil
- (search-all-arrangements "???.###?.???.###?.???.###?.???.###?.???.###" '(1 1 3 1 1 3 1 1 3 1 1 3 1 1 3))
+(search-all-arrangements "???.###?.???.###?.???.###?.???.###?.???.###" '(1 1 3 1 1 3 1 1 3 1 1 3 1 1 3))
 
 #+nil
- (search-all-arrangements "????" '(1 1))
+(search-all-arrangements "????" '(1 1))
 
 
 #+nil
@@ -235,15 +235,15 @@
 
 #+nil
 (let ((SLYNK-STICKERS:*BREAK-ON-STICKERS* (list :after)))
- (search-all-arrangements "????????" '(1 2)))
+  (search-all-arrangements "????????" '(1 2)))
 
- ; (".??..??...?##.?..??..??...?##.?..??..??...?##.?..??..??...?##.?..??..??...?##."
- ;  (1 1 3 1 1 3 1 1 3 1 1 3 1 1 3))
- ; ("?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#?"
- ;  (1 3 1 6 1 3 1 6 1 3 1 6 1 3 1 6 1 3 1 6))
- ; ("????.#...#...?.????.#...#...?.????.#...#...?.????.#...#...?.????.#...#..."
- ;  (4 1 1 4 1 1 4 1 1 4 1 1 4 1 1))
- ; ("????.######..#####.?.????.######..#####.?.????.######..#####.?.????.######..#####.?.????.######..#####."
- ;  (1 6 5 1 6 5 1 6 5 1 6 5 1 6 5))
- ; ("?###?????????.?###?????????.?###?????????.?###?????????.?###????????"
- ;  (3 2 1 3 2 1 3 2 1 3 2 1 3 2 1)))
+                                        ; (".??..??...?##.?..??..??...?##.?..??..??...?##.?..??..??...?##.?..??..??...?##."
+                                        ;  (1 1 3 1 1 3 1 1 3 1 1 3 1 1 3))
+                                        ; ("?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#??.?#?#?#?#?#?#?#?"
+                                        ;  (1 3 1 6 1 3 1 6 1 3 1 6 1 3 1 6 1 3 1 6))
+                                        ; ("????.#...#...?.????.#...#...?.????.#...#...?.????.#...#...?.????.#...#..."
+                                        ;  (4 1 1 4 1 1 4 1 1 4 1 1 4 1 1))
+                                        ; ("????.######..#####.?.????.######..#####.?.????.######..#####.?.????.######..#####.?.????.######..#####."
+                                        ;  (1 6 5 1 6 5 1 6 5 1 6 5 1 6 5))
+                                        ; ("?###?????????.?###?????????.?###?????????.?###?????????.?###????????"
+                                        ;  (3 2 1 3 2 1 3 2 1 3 2 1 3 2 1)))

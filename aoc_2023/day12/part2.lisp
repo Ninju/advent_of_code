@@ -73,21 +73,52 @@
                                                             ".~A"
                                                             (subseq spring end))))))))
 
-(let ((SLYNK-STICKERS:*BREAK-ON-STICKERS* (list :after)))
-  (lazy-string-paths (build-lazy-spring-tree "abc??def")))
-
 (defclass count-consumption-result (standard-object)
   ((new-counts :initarg :counts :reader get-counts)
    (success :initarg :success :reader success-p)
    (remainder :initarg :remainder :reader get-remainder)
    (unconsumed-string-end :initarg :unconsumed-string-end :reader get-unconsumed-string-end)))
 
-(defun consume-counts (spring counts)
-  (make-instance 'count-consumption-result
-                 :counts counts
-                 :success t
-                 :remainder 0
-                 :unconsumed-string-end ""))
+;; (defun consume-counts (spring counts)
+;;   (make-instance 'count-consumption-result
+;;                  :counts counts
+;;                  :success t
+;;                  :remainder 0
+;;                  :unconsumed-string-end ""))
+
+(defun consume-counts-p (spring counts)
+  (if (not (ppcre:scan *damaged-spring-regex* spring))
+      (values (list spring counts) 0 T)
+      (let ((count (car counts)))
+
+        (multiple-value-bind (start end) (ppcre:scan *damaged-spring-regex*
+                                                     spring)
+
+          (let* ((consumed (- end start))
+                 (unconsumed-spring (subseq spring end)))
+            (cond
+              ;; we've consumed more than allowed (cluster of #s > count)
+              ;; OR
+              ;; we've not consumed the entire count and the following char
+              ;; is not a #..
+              ((or (> consumed count) (and (< consumed count)
+                                           (> (length unconsumed-spring) 0)))
+               NIL)
+
+              ((< consumed count) (values (list unconsumed-spring
+                                                (cons (- count consumed)
+                                                      (cdr counts)))
+                                          consumed
+                                          NIL))
+
+              ((and (= consumed count)
+                    (not (cdr counts))) (values (list unconsumed-spring NIL)
+                                                consumed
+                                                T))
+
+              ((= consumed count) (consume-counts unconsumed-spring
+                                                  (cdr counts)))))))))
+
 
 (defun record-result ()
   (setf (gethash *current* *spring-arrangements*) T))
@@ -99,44 +130,44 @@
 (defun spring-tree-satisfies-counts-p (tree counts)
   (cond
     ((and (not tree) counts)
-      ;; failed to consume counts before reaching end of tree
-      NIL)
+     ;; failed to consume counts before reaching end of tree
+     NIL)
 
     ((and (not tree) (not counts)) (record-result))
 
     (t (let ((spring-partial (node-value tree)))
-        (with-slots (new-counts success remainder unconsumed-string-end)
-            (consume-counts spring-partial counts)
+         (with-slots (new-counts success remainder unconsumed-string-end)
+             (consume-counts spring-partial counts)
 
-          (cond
-            ((not success)         NIL)
+           (cond
+             ((not success)         NIL)
 
-            ;; next char MUST consume
-            ((> remainder 0) (spring-tree-satisfies-counts-p (choose #\# tree)
-                                                             (cons remainder
-                                                                   new-counts))
+             ;; next char MUST consume
+             ((> remainder 0) (spring-tree-satisfies-counts-p (choose #\# tree)
+                                                              (cons remainder
+                                                                    new-counts))
 
-             ;; next char must NOT consume
-             ((and (= remainder 0)
-                   (not new-counts)) (spring-tree-satisfies-counts-p (choose #\. tree)
-                                                                     new-counts))
+              ;; next char must NOT consume
+              ((and (= remainder 0)
+                    (not new-counts)) (spring-tree-satisfies-counts-p (choose #\. tree)
+                                                                      new-counts))
 
-             ;; next char must NOT consume
-             ((and (= remainder 0)
-                   (= (length unconsumed-string-end) 0))
+              ;; next char must NOT consume
+              ((and (= remainder 0)
+                    (= (length unconsumed-string-end) 0))
 
-              (spring-tree-satisfies-counts-p (choose #\. tree)
-                                              new-counts))
+               (spring-tree-satisfies-counts-p (choose #\. tree)
+                                               new-counts))
 
 
-             ;; there were chars at the end that didn't have damaged parts, so we can
-             ;; ditch the remainder as we need to check both branches of the tree
-             ((= remainder 0) (branch tree
-                                      new-counts))
+              ;; there were chars at the end that didn't have damaged parts, so we can
+              ;; ditch the remainder as we need to check both branches of the tree
+              ((= remainder 0) (branch tree
+                                       new-counts))
 
-             ;; we check remainder is ZERO and remainder > ZERO, so this should never
-             ;; happen
-             (t (error "Remainder is a negative number?")))))))))
+              ;; we check remainder is ZERO and remainder > ZERO, so this should never
+              ;; happen
+              (t (error "Remainder is a negative number?")))))))))
 
 (defun const (a b) a)
 (defun const-b (a b) a)
@@ -148,6 +179,11 @@
              (acc (funcall acc-fn acc-init current-node-val)))
 
         (if (funcall predicate acc)
+            (make-lazy-node (parent lazy-node)
+                            nil
+                            nil
+                            nil)
+
             (make-lazy-node (parent lazy-node)
                             current-node-val
                             (lazy-node-remove-if (left-get lazy-node)
@@ -185,16 +221,6 @@
               (list (lazy-node->list lhs)
                     (lazy-node->list rhs))))))
 
-(tree->paths
- (lazy-node->list  (build-lazy-spring-tree "abc??def"))
-
- )
-
- ; => (("abc" ("#" "#def") ("#" ".def")) ("abc" ("." "#def") ("." ".def")))
- ;
-(lazy-node-paths *test-tree*)
-
-
 (defun empty-node-p (tree) (not (car tree)))
 (defun non-empty-child-nodes (tree) (remove-if #'empty-node-p (cdr tree)))
 (defun node-has-children-p (tree) (> (length (non-empty-child-nodes tree)) 0))
@@ -206,19 +232,23 @@
       (let ((head (car tree)))
 
         (if (leaf-node-p tree)
-            (list head)
+            (list (list head))
 
             (let* ((children (non-empty-child-nodes tree))
                    (child-paths (mapcar #'tree->paths children)))
               (if (not children)
-                  (list head)
-                  (mapcar (lambda (p) (cons head p)) child-paths)))))))
+                  (list (list head))
+                  (loop for p in child-paths
+                        appending
+                        (loop for path in p
+                              collect
+                              (cons head path)))))))))
 
-(mapcar (lambda (xs)
-          (format nil "~{~A~}" xs))
-        (lazy-node-paths (build-lazy-spring-tree "abc??def")))
-(lazy-node->list  (build-lazy-spring-tree "abc??def"))
-
+(defun spring-tree->string-paths (spring-tree)
+  (->> spring-tree
+       (lazy-node->list)
+       (tree->paths)
+       (mapcar (lambda (path) (format nil "~{~A~}" path)))))
 
 (defparameter *test-tree* (make-lazy-node NIL
                                           "abc"
