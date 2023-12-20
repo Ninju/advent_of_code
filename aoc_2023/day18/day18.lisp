@@ -436,19 +436,19 @@ Return a new array, or write into the optional 3rd argument."
   (destructuring-bind ((lower-x lower-y) (upper-x upper-y)) rect
     (if (not (or (= (line-start-x line) lower-x)
                  (= (line-start-x line) upper-x)))
-            ;; line is not on the rectangle
-            (list 1 2 3)
-            (let ((upper-match (if (< (line-start-y line) lower-y)
-                                   (make-line (make-point (line-start-x line)
-                                                          (line-start-y line))
-                                              (make-point (line-start-x line)
-                                                          lower-y))))
-                  (lower-match (if (> (line-end-y line) upper-y)
-                                   (make-line (make-point (line-start-x line)
-                                                          upper-y)
-                                              (make-point (line-start-x line)
-                                                          (line-end-y line))))))
-              (remove nil (list upper-match lower-match))))))
+        ;; line is not on the rectangle
+        (list "NO NO")
+        (let ((upper-match (if (< (line-start-y line) lower-y)
+                               (make-line (make-point (line-start-x line)
+                                                      (line-start-y line))
+                                          (make-point (line-start-x line)
+                                                      (- lower-y 1)))))
+              (lower-match (if (> (line-end-y line) upper-y)
+                               (make-line (make-point (line-start-x line)
+                                                      (+ upper-y 1))
+                                          (make-point (line-start-x line)
+                                                      (line-end-y line))))))
+          (remove nil (list upper-match lower-match))))))
 
 (defun rectangle-between-parallel-vertical-lines (line adjacent-line)
   "Given LINE and ADJACENT-LINE returns a RECT and the REMAINING-LINES"
@@ -488,43 +488,85 @@ Return a new array, or write into the optional 3rd argument."
 
          (pair (find-if (lambda (candidate)
                           (lines-opposite-y-p leftmost-line candidate))
-                           (cdr lines-by-x))))
+                        (cdr lines-by-x))))
 
     (if (not pair)
-        (format t "~2&---- CANNOT FIND LEFTMOST PAIR, LINES=~A" lines))
+        (progn (format t "~2&---- CANNOT FIND LEFTMOST PAIR, LINES=~A" lines)
+               (error "UNEXPECTED!")))
 
     (values (cons leftmost-line pair)
-            (remove pair lines-by-x :test #'equal))))
+            (remove pair (cdr lines-by-x) :test #'equal))))
 
-(defun area-in-shape (lines)
-  (if (or (not lines) (not (cdr lines)))
-      0
-      (multiple-value-bind (leftmost-pair rest-of-lines)
-          (choose-next-leftmost-pair lines)
+(defun point-on-line-p (point line)
+  (and (between-p (x-coord point)
+                  (line-start-x line)
+                  (line-end-x line))
+       (between-p (y-coord point)
+                  (line-start-y line)
+                  (line-end-y line))))
 
-        (print (car leftmost-pair))
-        (print (cdr leftmost-pair))
-        (print lines)
+(defun draw-lines (empty-char line-char lines)
+  (let ((canvas (array-from-path (mapcan #'identity (copy-tree lines))
+                                 :initial-element empty-char)))
 
-        (multiple-value-bind (rect leftover-lines)
-            (rectangle-between-parallel-vertical-lines (car leftmost-pair)
-                                                       (cdr leftmost-pair))
-          (+ (rectangle-area rect)
-             (area-in-shape (append leftover-lines rest-of-lines)))))))
+    (destructuring-bind (h w) (array-dimensions canvas)
+      (loop for y from 0 below h
+            do
+               (loop for x from 0 below w
+                     do
+                        (if (some (lambda (l) (point-on-line-p (list x y) l))
+                                  lines)
+                            (setf (aref canvas y x) line-char)))))
+    canvas))
+
+(defun area-in-shape (lines &optional (recursion-limit 10000))
+  (if (< recursion-limit 0)
+      (error "Recursion limit reached")
+      (if (or (not lines) (not (cdr lines)))
+          0
+          (multiple-value-bind (leftmost-pair rest-of-lines)
+              (choose-next-leftmost-pair lines)
+
+            (format t "~&LEFT=~A , RIGHT=~A~&   Chosen from: ~A"
+                    (car leftmost-pair)
+                    (cdr leftmost-pair)
+                    lines)
+
+            (multiple-value-bind (rect leftover-lines)
+                (rectangle-between-parallel-vertical-lines (car leftmost-pair)
+                                                           (cdr leftmost-pair))
+              (+ (rectangle-area rect)
+                 (area-in-shape (append leftover-lines rest-of-lines)
+                                (- recursion-limit 1))))))))
 
 #+nil
 (let ((SLYNK-STICKERS:*BREAK-ON-STICKERS* (list :after)))
   (rectangle-area
    (rectangle-between-parallel-vertical-lines '((0 0) (0 500254)) '((461937 0) (461937 56407)))))
- ; => 26056480359 (35 bits, #x611165667)
+                                        ; => 26056480359 (35 bits, #x611165667)
 
 #+nil
 (let ((SLYNK-STICKERS:*BREAK-ON-STICKERS* (list :after)))
   (area-in-shape
    (sort-lines-by-x-asc
-    (remove-if-not #'vertical-line
-                   (instructions->lines '(0 0)
-                                        (load-instructions-from-file "example.txt"))))))
+    (remove-duplicates
+     (remove-if-not #'vertical-line
+                    (instructions->lines '(0 0)
+                                         (load-instructions-from-file "input.txt")))
+     :test #'equal))))
+
+#+nil
+(progn
+  (format t "~5&")
+  (draw-array-of-chars
+   (draw-lines #\. #\X
+               ;; (remove-if-not #'vertical-line
+               (instructions->lines '(0 0)
+                                    (load-instructions-from-file "test3.txt")))))
+)
+
+;; (some (lambda (l) (point-on-line-p '(0 3) l)) '(((0 0) (0 2)) ((2 2) (2 5)) ((0 5) (0 7)) ((1 7) (1 9)) ((6 7) (6 9))
+;; ((4 5) (4 7)) ((6 0) (6 5))))
 
 #+nil
 (loop for line in '(((2 2) (0 2)) ((9 3) (9 8)))
@@ -532,11 +574,15 @@ Return a new array, or write into the optional 3rd argument."
 
 #+nil
 (split-line-by-rectangle (make-rectangle '(0 4) '(8 8))
-                         (make-line '(0 1) '(0 5)))
+                         (make-line '(0 1) '(0 10)))
+
+#+nil
+(split-line-by-rectangle (make-rectangle '(0 2) '(8 8))
+                         (make-line '(0 0) '(0 2)))
 
 #+nil
 (* 461937 56407)
- ;; 26,056,480,359
+;; 26,056,480,359
 
 #+nil
 (part1 "example.txt")
@@ -570,8 +616,8 @@ Return a new array, or write into the optional 3rd argument."
 #+nil
 (choose-next-leftmost-pair
  '(((0 0) (0 500254)) ((5411 500254) (5411 1186328)) ((461937 0) (461937 56407))
-  ((497056 356353) (497056 1186328)) ((609066 356353) (609066 1186328))
-  ((818608 56407) (818608 919647)) ((1186328 919647) (1186328 1186328))))
+   ((497056 356353) (497056 1186328)) ((609066 356353) (609066 1186328))
+   ((818608 56407) (818608 919647)) ((1186328 919647) (1186328 1186328))))
 
 
 #+nil
@@ -598,7 +644,7 @@ Return a new array, or write into the optional 3rd argument."
 
 #+nil
 (let ((*history* '())
-      (*test-path* (accumulate-path '(0 0) (load-instructions-from-file "input.txt"))))
+      (*test-path* (accumulate-path '(0 0) (load-instructions-from-file "test3.txt"))))
   (-> (search-points-within-path *test-path*)
       (collect-array-positions (lambda (c) (= 1 c)))
       (append *test-path*)
@@ -678,3 +724,6 @@ Return a new array, or write into the optional 3rd argument."
 (move
  (move '(0 0) (make-instruction *north* 2))
  (make-instruction *east* 3))
+
+#+nil
+(split-line-by-rectangle '((0 2) (2 2)) '((0 0) (0 2)))

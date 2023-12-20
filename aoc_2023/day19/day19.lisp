@@ -1,5 +1,7 @@
 (in-package :aoc_2023)
 
+;; INCLUDES
+
 (ql:quickload :alexandria)
 (ql:quickload :arrows)
 (ql:quickload :cl-ppcre)
@@ -7,6 +9,8 @@
 (use-package :arrows)
 
 (declaim (optimize (debug 3)))
+
+;; PROGRAM HELPERS
 
 (defparameter *day-number* 19)
 
@@ -16,16 +20,26 @@
         (merge-pathnames (format nil "day~d/inputs/" *day-number*))
         (merge-pathnames #p"/home/alex/src/workspace/advent_of_code/aoc_2023/"))))
 
+(defparameter *iter-limit* 10000)
+
+(defmacro protect-against-infinite-loop! ()
+  `(progn
+     (decf *iter-limit*)
+     (if (< *iter-limit* 0)
+         (progn (setf *iter-limit* 0)
+                (error "Reached iteration limit!")))))
+
+;; DATA STRUCTURES
+
 (defun alist-update (key alist new-value &rest args)
   (let ((args-with-key (append args (list :key #'car))))
     (funcall #'acons key new-value
              (apply #'remove key alist args-with-key))))
 
-;; DATA STRUCTURES
-
 (defun make-range (a b) (cons a b))
 (defun start (range) (car range))
 (defun end (range) (cdr range))
+(defun range-size (r) (- (end r) (start r)))
 
 (defclass rule (standard-object)
   ((category :initarg :category :reader category)
@@ -88,7 +102,6 @@
                           (destructuring-bind (cat val) (ppcre:split "=" match)
                             (make-rating-part cat (parse-integer val))))))
     (make-rating components)))
-
 
 (defun parse-operator (op) op)
 
@@ -205,9 +218,6 @@
                                                (- (threshold rule)
                                                   1)))))
 
-;; RUNE
-;;
- ; => (1549 . 4000), (4001 . 4000), (838 . 1548)
 (defun stable-range-intersect (range-1 range-2)
   (cond
     ((or (> (start range-1) (end range-2))
@@ -240,17 +250,32 @@
   (let* ((cat (category rule))
          (cat-range (cdr (assoc cat ranges :test #'equal))))
 
-    (multiple-value-bind (matched-range lhs-unmatched rhs-unmatched)
-        (range-intersect (range-for-rule rule) cat-range)
+    (multiple-value-bind (matched-range range-unmatched rule-unmatched)
+        (stable-range-intersect cat-range (range-for-rule rule))
 
-      (cons (if matched-range
-                (cons (outcome rule)
-                      (alist-update cat ranges matched-range :test #'equal)))
+        (declare (ignore rule-unmatched))
 
-            (mapcar (lambda (unmatched-range)
-                      (cons NIL (alist-update cat ranges unmatched-range :test #'equal)))
-                    (remove nil (list lhs-unmatched rhs-unmatched)))))))
+          (list
+           (if matched-range
+               (cons (outcome rule)
+                     (alist-update cat ranges matched-range :test #'equal)))
 
+           (if range-unmatched
+               (cons NIL
+                     (alist-update cat ranges range-unmatched :test #'equal)))))))
+
+(defun rule->string (rule)
+  (format nil "~A ~A ~A => '~A'"
+          (category rule)
+          (operator rule)
+          (threshold rule)
+          (outcome rule)))
+
+(defun workflow->string (workflow)
+  (format nil "~A ~{~A~^ -> ~} OR ~A"
+          (id workflow)
+          (mapcar #'rule->string (rules workflow))
+          (default-outcome workflow)))
 
 (defun apply-workflow-to-ranges (workflow ranges)
   (let ((results '())
@@ -259,40 +284,39 @@
 
     (loop for rule in (rules workflow)
           do
-             ;; (format t "~3&Processing next rule: ~A ~A ~A => ~A"
-             ;;         (category rule)
-             ;;         (operator rule)
-             ;;         (threshold rule)
-             ;;         (outcome rule))
              (loop for range in unmatched-ranges
                    do
-                   (destructuring-bind (matched &rest unmatched)
-                       (apply-rule-to-ranges rule range)
+                      (let ((rule-match-result (apply-rule-to-ranges rule range)))
+                        (if (< (count nil rule-match-result :test #'equal) 2)
+                            (progn
+                              (destructuring-bind (matched . unmatched)
+                                  rule-match-result
 
-                     (if matched
-                         (push matched results))
 
-                     (if unmatched
-                         (setf interim-ranges
-                               (remove nil
-                                       (append (mapcar #'cdr unmatched)
-                                               interim-ranges))))))
+                                (if matched
+                                    (push matched results))
 
-             ;; (format t "~&UNMATCH RANGES = ~A" unmatched-ranges)
-             ;; (format t "~&INTERIM RANGES = ~A" interim-ranges)
-             (setf unmatched-ranges interim-ranges)
-             (setf interim-ranges '())
+                                (if unmatched
+                                    (setf interim-ranges
+                                          (remove nil
+                                                  (cons unmatched
+                                                        interim-ranges))))
 
-             (append results matched)
-             ;; (format t "~&INTERIM RANGES = ~A" interim-ranges)
-             )
+                                (format t "~&UNMATCH RANGES = ~A" unmatched-ranges)
+                                (format t "~&INTERIM RANGES = ~A" interim-ranges)
+                                (setf unmatched-ranges interim-ranges)
+                                (setf interim-ranges '())
+
+                                (append results matched)
+                                ;; (format t "~&INTERIM RANGES = ~A" interim-ranges)
+                                ))))))
 
 
 
     (append results (mapcar (lambda (unmatched-range)
-                                       (cons (default-outcome workflow)
-                                             unmatched-range))
-                                     unmatched-ranges))))
+                              (cons (default-outcome workflow)
+                                    unmatched-range))
+                            unmatched-ranges))))
 
 
 (defun load-workflows-hashmap-from-file (filename)
@@ -307,20 +331,15 @@
 
     (let ((new-ranges (apply-workflow-to-ranges workflow ranges)))
 
-      (let ((a-ranges (remove-if-not (lambda (e)
-                                       (string= "A" (car e)))
-                                     new-ranges))
-            (other-ranges (remove-if (lambda (e)
-                                       (or (string= "R" (car e))
-                                           (string= "A" (car e))))
-                                     new-ranges)))
+      (let ((a-ranges (remove-if-not #'accepted-p new-ranges :key #'car))
+            (other-ranges (remove-if (lambda (e) (or (rejected-p e)
+                                                     (accepted-p e)))
+                                     new-ranges
+                                     :key #'car)))
 
-        (setf accepted-ranges (append (mapcar #'cdr a-ranges)
-                                      accepted-ranges))
+        (setf accepted-ranges (append (mapcar #'cdr a-ranges) accepted-ranges))
 
         (list accepted-ranges other-ranges)))))
-
-(defparameter *iter-limit* 10000)
 
 (defun step-forward-workflows-recursively (workflows-hashmap
                                            queue
@@ -328,10 +347,7 @@
   (if (not queue)
       (return-from step-forward-workflows-recursively acc-accepted))
 
-  (decf *iter-limit*)
-  (if (< *iter-limit* 0)
-      (progn (setf *iter-limit* 0)
-             (error "Reached iteration limit!")))
+  (protect-against-infinite-loop!)
 
   (let* ((current (car queue))
          (current-workflow-id (car current))
@@ -346,69 +362,90 @@
                                           (append others (cdr queue))
                                           (append accepted acc-accepted)))))
 
-(defun ranges->distinct-possibilities (ranges)
-  (reduce #'*
-          ranges
-          :key (lambda (range) (- (end range) (start range)))))
-
-(defun condense-range (r1 r2)
-  (range-intersect '(300 . 450) '(200 . 300))
-  )
-
-(defun range-size (r) (- (end r) (start r)))
-
-(defun consolidate-ranges (r1 r2)
-  (loop for c in (list "x" "m" "a" "s")
-        collect
-        (multiple-value-bind (inter lhs rhs) (range-intersect (alexandria:assoc-value r1 c :test #'equal)
-                                                              (alexandria:assoc-value r2 c :test #'equal))
-            (if (not inter)
-                (return nil)
-                (cons c (list inter lhs rhs)))))))))
+(defun distinct-values-in-ranges (ranges) (reduce #'* ranges :key #'range-size))
+(defun invalid-xmas-range (rangeset) (not (= 4 (length rangeset))))
+(defun sum-xmas-ranges (rangesets)
+  (loop for ranges in (remove-if #'invalid-xmas-range rangesets)
+        sum (distinct-values-in-ranges (mapcar #'cdr ranges))))
 
 #+nil
-(consolidate-ranges (caddr *test-accepted-ranges*)
-                    (cadddr *test-accepted-ranges*))
+(apply-workflow-to-ranges (gethash "in" *test-workflows-hashmap*)
+'(("m" 1549 . 4000) ("s" 2771 . 3448) ("x" 1 . 4000) ("a" 1 . 4000)))
 
+#+nil
+(stable-range-intersect '(1549 . 4000) '(838 . 4000))
 
+#+nil
+;; (stable-range-intersect '(0 . 1000) '(500 . 2000))
+;; => (0 . 499) (500 . 1000) (1001 . 2000)
+;;
+;; (stable-range-intersect '(500 . 2000) '(0 . 1000))
+;; => (1001 . 2000) (500 . 1000) (0 . 499)
+;;
+;; (stable-range-intersect '(850 . 1002) '(500 . 1000))
+;; => (250 . 499) (500 . 750) (751 . 1000)
 
-(defun part2 ()
-  (let ((all-m (loop for accepted in *test-accepted-ranges*
-                     collect (assoc "s" accepted :test #'equal))))
+#+nil
+(let* ((workflow  (parse-workflow "px{a<2006:qkq,m>2090:A,rfg}")))
+  (apply-rule-to-ranges (car (rules workflow)) *test-ranges*))
 
-    (remove-duplicates
-     (sort (mapcar #'cdr all-m)
-           #'>
-           :key #'range-size) :test #'equal))
-  ;;
-  ;; (* 4000 4000 3711 4000)
-  ;; (< (* 1337 838 1716 551) 167409079868000)
-  ;; 167409079868000
-  )
+#+nil
+(defparameter *test-workflow* (parse-workflow "px{a<2006:qkq,m>2090:A,rfg}"))
+
+#+nil
+(apply-workflow-to-ranges *test-workflow* *test-ranges*)
+
+;; TESTE
+#+nil
+(step-forward-workflows-recursively *test-workflows-hashmap*
+                                    (list (cons "in" *initial-ranges*))
+                                    '())
+
+#+nil
+(consolidate-ranges '(("x" 1549 . 4000) ("m" 0 . 4000) ("a" 0 . 4000) ("s" 0 . 4000))
+                    '(("x" 1800 . 3000) ("m" 0 . 4000) ("a" 0 . 4000) ("s" 0 . 4000)))
 
 #+nil
 (defparameter *test-rule* (parse-rule "s<537:gd,x>2440:R,A"))
 
 #+nil
-(defparameter *test-accepted-ranges* '((("m" 1549 . 4000) ("s" 2771 . 3448) ("x" 0 . 4000) ("a" 0 . 4000))
-                                       (("m" 0 . 1548) ("s" 2771 . 3448) ("x" 0 . 4000) ("a" 0 . 4000))
-                                       (("s" 3449 . 4000) ("x" 0 . 4000) ("m" 0 . 4000) ("a" 0 . 4000))
-                                       (("a" 0 . 1716) ("m" 1801 . 4000) ("s" 1351 . 2770) ("x" 0 . 4000))
-                                       (("a" 0 . 1716) ("m" 0 . 838) ("s" 1351 . 2770) ("x" 0 . 4000))
-                                       (("m" 839 . 1800) ("s" 1351 . 2770) ("x" 0 . 4000) ("a" 0 . 4000))
-                                       (("x" 0 . 2440) ("s" 537 . 1350) ("m" 0 . 2090) ("a" 2006 . 4000))
-                                       (("x" 2663 . 4000) ("a" 0 . 2005) ("s" 0 . 1350) ("m" 0 . 4000))
-                                       (("x" 0 . 1415) ("a" 0 . 2005) ("s" 0 . 1350) ("m" 0 . 4000))
-                                       (("m" 2091 . 4000) ("a" 2006 . 4000) ("s" 0 . 1350) ("x" 0 . 4000))))
+(defparameter *test-accepted-ranges* '((("m" 1549 . 4000) ("s" 2771 . 3448) ("x" 1 . 4000) ("a" 1 . 4000))
+                                       (("m" 1 . 1548) ("s" 2771 . 3448) ("x" 1 . 4000) ("a" 1 . 4000))
+                                       (("s" 3449 . 4000) ("x" 1 . 4000) ("m" 1 . 4000) ("a" 1 . 4000))
+                                       (("a" 1 . 1716) ("m" 1801 . 4000) ("s" 1351 . 2770) ("x" 1 . 4000))
+                                       (("a" 1 . 1716) ("m" 1 . 838) ("s" 1351 . 2770) ("x" 1 . 4000))
+                                       (("m" 839 . 1800) ("s" 1351 . 2770) ("x" 1 . 4000) ("a" 1 . 4000))
+                                       (("a" 1 . 1716) ("m" 1801 . 4000) ("s" 0 . 0) ("x" 1 . 4000))
+                                       (("a" 1 . 1716) ("m" 1 . 838) ("s" 0 . 0) ("x" 1 . 4000))
+                                       (("m" 839 . 1800) ("s" 0 . 0) ("x" 1 . 4000) ("a" 1 . 4000))
+                                       (("x" 1 . 2440) ("s" 537 . 1350) ("m" 1 . 2090) ("a" 2006 . 4000))
+                                       (("x" 2663 . 4000) ("a" 1 . 2005) ("s" 1 . 1350) ("m" 1 . 4000))
+                                       (("x" 1 . 1415) ("a" 1 . 2005) ("s" 1 . 1350) ("m" 1 . 4000))
+                                       (("m" 2091 . 4000) ("a" 2006 . 4000) ("s" 1 . 1350) ("x" 1 . 4000))
+                                       (("m" 2091 . 4000) ("a" 0 . 0) ("s" 1 . 1350) ("x" 1 . 4000))))
+
+#+nil
+(defparameter *test-workflows-hashmap* (load-workflows-hashmap-from-file "input.txt"))
+
+#+nil
+(step-forward-workflows-recursively *test-workflows-hashmap*
+                                    (list (cons "in" *initial-ranges*))
+                                    '())
 
 #+nil
 (loop for ranges in (step-forward-workflows-recursively (load-workflows-hashmap-from-file "example.txt")
                                                         (list (cons "in" *initial-ranges*))
                                                         NIL)
-      sum
-      (ranges->distinct-possibilities (mapcar #'cdr ranges)))
 
- ; => 188598466743200 (48 bits, #xAB87809D8BA0)
+      sum
+      (if (= 4 (length ranges))
+          (ranges->distinct-possibilities (mapcar #'cdr ranges))
+          0))
+
+ ; => (< 167409079868000 188598466743200) (48 bits, #xAB87809D8BA0)
+
+#+nil
+(defparameter *test-ranges* '(("a" 2006 . 4000) ("m" 2091 . 4000) ("s" 0 . 1350) ("x" 0 . 4000)))
 
 
 #+nil
@@ -417,15 +454,14 @@
                                     NIL)
 
 #+nil
-(apply-rule-to-ranges *test-rule* *initial-ranges*)
+(step-forward-workflows-recursively (load-workflows-hashmap-from-file "example.txt")
+                                    (list (cons "in" (car *test-accepted-ranges*))
+                                    NIL))
 
 #+nil
-(car (mapcar #'cdr '(("gd" ("s" 0 . 536) ("x" 0 . 4000) ("m" 0 . 4000) ("a" 0 . 4000))
- (NIL ("s" 537 . 4000) ("x" 0 . 4000) ("m" 0 . 4000) ("a" 0 . 4000)))))
+(apply-rule-to-ranges *test-rule* *ranges*)
 
-#+nil
-(apply-workflow-to-ranges (parse-workflow "px{a<2006:qkq,m>2090:A,rfg}")
-                          *initial-ranges*)
+(defparameter *test-rule* (parse-rule "px{a<2006:qkq,m>2090:A,rfg}"))
 
 #+nil
 (let ((workflows-hashmap (load-workflows-hashmap-from-file "example.txt")))
