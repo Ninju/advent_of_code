@@ -10,7 +10,7 @@
 
 ;; PROGRAM HELPERS
 
-(defparameter *day-number* 21)
+(defparameter *day-number* 22)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun get-inputs-pathname (filename)
