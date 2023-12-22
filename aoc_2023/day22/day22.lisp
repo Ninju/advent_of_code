@@ -40,10 +40,15 @@
 (defun y-coord (pos) (cadr pos))
 (defun z-coord (pos) (caddr pos))
 
-(defstruct (brick (:constructor %make-brick)) left-edge right-edge bounding-rect)
+(defstruct (brick (:constructor %make-brick)) id left-edge right-edge bounding-rect)
+
+(defparameter *brick-id-cursor* 0)
+(defun next-id ()
+  (incf *brick-id-cursor*))
 
 (defun make-brick (lhs rhs)
-  (%make-brick :left-edge lhs
+  (%make-brick :id (next-id)
+               :left-edge lhs
                :right-edge rhs
                :bounding-rect (apply #'make-rect
                                      (if (= (x-coord lhs)
@@ -69,6 +74,10 @@
       (= *ground-z* (z-coord (right-edge brick)))))
 (defun min-z-coord (brick)
   (min (z-coord (left-edge brick))
+       (z-coord (right-edge brick))))
+
+(defun max-z-coord (brick)
+  (max (z-coord (left-edge brick))
        (z-coord (right-edge brick))))
 
 (defun brick-x-coords (brick) (list (x-coord (left-edge brick))
@@ -195,37 +204,94 @@
              (with-slots (id) brick-at-pos id)
              "."))))))
 
-(defun stash ()
+(defun part1 (filename)
   (let ((*brick-id-cursor* 0))
-    (let ((bricks (sort (load-from-file "example.txt") #'< :key #'min-z-coord))
+    (let ((bricks (sort (load-from-file filename) #'< :key #'min-z-coord))
           (placed-bricks '())
 
           ;; KEY => LIST of supported bricks (i.e. KEY supports bricks in LIST)
-          (support-network (make-hash-table :size 150 :test #'equal)))
+          (support-network (make-hash-table :size 150 :test #'equal))
 
-      (format t "~2&INIT: Plotting X and Z")
-        (visualize-z #'x-coord bricks '(10 3))
+          ;; KEY => LIST where KEY is supported by bricks in LIST)
+          (reverse-support-network (make-hash-table :size 150 :test #'equal)))
 
-      (format t "~2&INIT: Plotting Y and Z")
-        (visualize-z #'y-coord bricks '(10 3))
+      ;; (format t "~2&INIT: Plotting X and Z")
+      ;; (visualize-z #'x-coord bricks '(10 3))
+
+      ;; (format t "~2&INIT: Plotting Y and Z")
+      ;; (visualize-z #'y-coord bricks '(10 3))
 
       (loop for brick in bricks do
-        (let ((collision (find-if (lambda (placed-brick)
-                                    (bricks-would-collide-p brick placed-brick))
-                                  placed-bricks)))
-          (if (not collision)
+        (setf (gethash (brick-id brick) support-network) NIL)
+        (setf (gethash (brick-id brick) reverse-support-network) NIL)
+
+        (let ((collisions (remove-if-not (lambda (placed-brick)
+                                           (bricks-would-collide-p brick placed-brick))
+                                         placed-bricks)))
+
+          (if (not collisions)
               (push (move-brick-directly-to-z! brick *ground-z*)
                     placed-bricks)
-              (push (move-brick-directly-to-z! brick (+ 1 (max-z-coord collision)))
-                    placed-bricks))))
 
-       (format t "~2&DONE: Plotting X and Z")
-        (visualize-z #'x-coord placed-bricks '(7 3))
+              (progn
+                (let* ((max-z (reduce #'max collisions :key #'max-z-coord))
+                       (proper-collisions (remove-if-not (lambda (z) (= z max-z))
+                                                         collisions
+                                                         :key #'max-z-coord)))
+                  (loop for collision in proper-collisions do
+                    (setf (gethash (brick-id collision) support-network)
+                          (cons (brick-id brick) (gethash (brick-id collision)
+                                                          support-network)))
 
-      (format t "~2&DONE: Plotting Y and Z")
-        (visualize-z #'y-coord placed-bricks '(7 3))))
+                    (setf (gethash (brick-id brick) reverse-support-network)
+                          (cons (brick-id collision) (gethash (brick-id brick)
+                                                              reverse-support-network))))
 
-  )
+                  (push (move-brick-directly-to-z! brick
+                                                   (+ 1 max-z))
+                        placed-bricks))))))
 
-;; #+nil
+      ;; (format t "~2&DONE: Plotting X and Z")
+      ;; (visualize-z #'x-coord placed-bricks '(7 3))
+
+      ;; (format t "~2&DONE: Plotting Y and Z")
+      ;; (visualize-z #'y-coord placed-bricks '(7 3))
+
+      (let ((count 0))
+        (loop for key in (alexandria:hash-table-keys support-network) do
+          (let ((supports (gethash key support-network)))
+            (if (not supports)
+                (incf count)
+                (if (every (lambda (supported-brick-id)
+                             (> (length (gethash supported-brick-id
+                                                 reverse-support-network))
+                                1))
+                           supports)
+                    (incf count)))))
+        count))))
+
+(part1 "input.txt")
+
+; DONE: Plotting X and Z...
+; .G.
+; .G.
+; FFF
+; D.E
+; CCC
+; .A.
+
+; DONE: Plotting Y and Z...
+; .G.
+; .G.
+; .F.
+; EEE
+; B.C
+; AAA
+;  => (((#\G) (#\F #\G) (#\E #\F) (#\D #\F) (#\C #\E #\D) (#\B #\E #\D)
+;   (#\A #\G #\F #\C #\B))
+;
+;  ((#\G #\A #\F) (#\F #\A #\D #\E) (#\E #\B #\C) (#\D #\B #\C) (#\C #\A)
+;   (#\B #\A) (#\A)))
+
+;; +nil
 ;; (load-from-file "example.txt")
