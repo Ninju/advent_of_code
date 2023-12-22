@@ -12,6 +12,8 @@
 
 (defparameter *day-number* 22)
 
+(defparameter *ground-z* 1)
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun get-inputs-pathname (filename)
     (-> filename
