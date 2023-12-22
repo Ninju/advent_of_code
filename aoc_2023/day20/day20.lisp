@@ -31,19 +31,23 @@
 
 ;; HELPERS
 
-(defparameter +low-pulse+ 0)
-(defparameter +high-pulse+ 1)
+(defun array->list (arr)
+  (loop for a across arr collect a))
+
+(defparameter +low-pulse+ 1)
+(defparameter +high-pulse+ 2)
 
 (defun pulse (sym)
   (cond ((eql sym :high) +high-pulse+)
-        ((eql sym :low) +low-pulse+)))
+        ((eql sym :low) +low-pulse+)
+        (t (error "Unrecognised pulse, expected :low or :high"))))
 
 (defun low-pulse-p (pulse) (= +low-pulse+ pulse))
 (defun high-pulse-p (pulse) (= +high-pulse+ pulse))
 
 (defun opposite-pulse (pulse)
-  (cond ((low-pulse-p pulse) +high-pulse+)
-        ((high-pulse-p pulse) +low-pulse+)))
+  (cond ((low-pulse-p pulse) (pulse :high))
+        ((high-pulse-p pulse) (pulse :low))))
 
 (defun pulse->string (pulse)
   (cond ((high-pulse-p pulse) "high")
@@ -51,9 +55,28 @@
 
 (defun flip-state (state)
   (cond ((eql :off state) :on)
-        ((eql :on state) :off)))
+        ((eql :on state) :off)
+        (t (error "Unrecognised state, expected :on or :off"))))
 
 ;; DATA STRUCTURES
+
+(defstruct (queue (:constructor %make-queue)) contents)
+
+(defun make-queue (&rest initial-contents)
+  (%make-queue :contents initial-contents))
+
+(defun queue-push (queue &rest elements)
+  (with-slots (contents) queue
+    (setf contents (append contents elements))))
+
+(defun queue-pop (queue)
+  (with-slots (contents) queue
+    (prog1 (car contents)
+      (setf contents (cdr contents)))))
+
+(defun queue->list (queue)
+  (with-slots (contents) queue
+    contents))
 
 (defclass module (standard-object)
   ((id :initarg :id :reader id)
@@ -62,11 +85,7 @@
    (outputs :initarg :outputs
             :reader outputs)
    (received-pulses :accessor received-pulses
-                    :initform (make-array 100 :fill-pointer 0
-                                              :adjustable t))
-   (received-senders :accessor received-senders
-                     :initform (make-array 100 :fill-pointer 0
-                                               :adjustable t))))
+                    :initform (make-queue))))
 
 (defclass flip-flop (module)
   ((state :initform :off :initarg :state :accessor state)))
@@ -78,10 +97,18 @@
    (received-from-inputs-map :initform NIL
                              :accessor received-from-inputs-map)))
 
+(defclass broadcaster (module) ())
 (defclass output-module (module) ())
+
+(defgeneric receive-pulse (module sender pulse))
+(defgeneric dispatch (module))
+(defgeneric conjunction-p (module))
 
 (defmethod initialize-instance :after ((module output-module) &key)
   (setf (slot-value module 'outputs) '()))
+
+(defmethod conjunction-p ((module conjunction)) T)
+(defmethod conjunction-p ((module T)) NIL)
 
 (defmethod print-object ((object module) stream)
   (print-unreadable-object (object stream :type t)
@@ -92,20 +119,15 @@
   (print-unreadable-object (object stream :type t)
     (format stream "~s" (id object))))
 
-(defgeneric receive-pulse (module sender pulse))
-(defgeneric dispatch (module))
-
 (defun dispatch-pulse-to-outputs (dispatcher pulse)
-  (mapcar (lambda (output)
-            (list (id dispatcher) pulse output))
+  (mapcar (lambda (output) (list (id dispatcher) pulse output))
           (outputs dispatcher)))
 
 (defmethod receive-pulse ((module module) sender pulse)
   (cond ((high-pulse-p pulse) (incf (high-pulses-received-count module)))
         ((low-pulse-p pulse) (incf (low-pulses-received-count module))))
 
-  (vector-push pulse (received-pulses module))
-  (vector-push sender (received-senders module)))
+  (queue-push (received-pulses module) pulse))
 
 (defun alist-update (key alist new-value &rest args)
   (let ((args-with-key (append args (list :key #'car))))
@@ -119,51 +141,37 @@
 
   (call-next-method))
 
-
 (defmethod receive-pulse ((module T) sender pulse)
   (call-next-method))
 
-(defun pop-sender-with-pulse (module)
-  (list (vector-pop (received-senders module))
-        (vector-pop (received-pulses module))))
-
 (defmethod dispatch ((module module))
-  (destructuring-bind (_sender pulse) (pop-sender-with-pulse module)
-    (declare (ignore _sender))
-
-    (dispatch-pulse-to-outputs module pulse)))
+  (with-slots (received-pulses) module
+    (dispatch-pulse-to-outputs module (queue-pop received-pulses))))
 
 (defmethod dispatch ((module flip-flop))
-  (destructuring-bind (_sender pulse) (pop-sender-with-pulse module)
-    (declare (ignore _sender))
-
-    (if (low-pulse-p pulse)
-        (progn
+  (with-slots (received-pulses) module
+    (let ((pulse (queue-pop received-pulses)))
+      (if (low-pulse-p pulse)
+          (progn
             (setf (state module) (flip-state (state module)))
             (if (eql :on (state module))
                 (dispatch-pulse-to-outputs module (pulse :high))
-                (dispatch-pulse-to-outputs module (pulse :low)))))))
-
-(defun array->list (arr)
-  (loop for a across arr collect a))
+                (dispatch-pulse-to-outputs module (pulse :low))))))))
 
 (defmethod dispatch ((module conjunction))
   (with-slots (received-from-inputs-map inputs) module
     (let ((pulse-to-dispatch
-            (if (every (lambda (input)
-                         (eql (pulse :high)
-                              (alexandria:assoc-value received-from-inputs-map
-                                                      input
-                                                      :test #'equal)))
-                       inputs)
-                (pulse :low)
-                (pulse :high))))
+            (if (not
+                 (every (lambda (input)
+                          (eql (pulse :high)
+                               (alexandria:assoc-value received-from-inputs-map
+                                                       input
+                                                       :test #'equal)))
+                        inputs))
+                (pulse :high)
+                (pulse :low))))
 
       (dispatch-pulse-to-outputs module pulse-to-dispatch))))
-
-(defgeneric conjunction-p (module))
-(defmethod conjunction-p ((module conjunction)) T)
-(defmethod conjunction-p ((module T)) NIL)
 
 ;; FILE PARSING
 
@@ -235,20 +243,22 @@
 (defun find-module (id module-network)
   (gethash id module-network))
 
-(defun routing-to-output-p (routing)
-  (destructuring-bind (source-id pulse destination-id) routing
-      (declare (ignore source-id) (ignore pulse))
-    (string= destination-id "output")))
+(defun distinct-routes (routing)
+  (remove-duplicates routing :test #'equal
+                     :key (lambda (k)
+                            (destructuring-bind (source-id pulse destination-id) k
+                              (declare (ignore source-id) (ignore pulse))
+                              destination-id))))
 
 (defun step-once (module-network routing)
   (loop for (source-id pulse destination-id) in routing
         append
         (progn
           (let ((destination-mod (find-module destination-id module-network)))
-            ;; (format t "~&~a -~a-> ~a"
-            ;;         source-id
-            ;;         (pulse->string pulse)
-            ;;         destination-id)
+            (format t "~&~a -~a-> ~a"
+                    source-id
+                    (pulse->string pulse)
+                    destination-id)
 
             (receive-pulse destination-mod source-id pulse)
             (dispatch destination-mod)))))
@@ -279,7 +289,7 @@
                        (initial-routing (pulse :low)))))
 
   (loop for key in (alexandria:hash-table-keys module-network)
-        for mod = (gethash key module-network)
+        for mod = (find-module key module-network)
         summing (low-pulses-received-count mod) into low-count
         summing (high-pulses-received-count mod) into high-count
         finally (return (list low-count high-count))))
@@ -287,18 +297,22 @@
 (defun part1 (filename)
   (let* ((modules (load-modules-from-file filename))
          (module-network (build-module-network modules)))
-    (->> (press-button-n-times 1000 module-network))))
+    (->> (press-button-n-times 1000 module-network)
+         (reduce #'*))))
 
 #+nil
 (format t "~25&")
 
 #+nil
-(part1 "input.txt")
+(with-open-file (*standard-output* "standard_output.log"
+                                   :direction :output
+                                   :if-exists :supersede)
+  (part1 "input.txt"))
+ ; => 1092834855 (31 bits, #x41235627)
 ; Pressed 1000 times => (26145 41799)
 
-
 #+nil
-(let* ((modules (load-modules-from-file "interesting_example.txt"))
+(let* ((modules (load-modules-from-file "input.txt"))
        (module-network (build-module-network modules)))
   (press-button-n-times 1000 module-network))
 
@@ -306,20 +320,11 @@
 (->> (load-modules-from-file "input.txt"))
 
 #+nil
-(let* ((modules (load-modules-from-file "loop_example.txt"))
-       (module-network (build-module-network modules)))
-  (destructuring-bind (source-id pulse destination-id)
-      '("broadcaster" 0 "a")
-    (let ((mod (find-module destination-id module-network)))
-      (receive-pulse mod source-id pulse)
-      (received-senders mod))))
-
-#+nil
 (let ((modules (load-modules-from-file "loop_example.txt")))
-  (alexandria:hash-table-alist (build-module-network modules)))
+  (alexandrdia:hash-table-alist (build-module-network modules)))
 
 #+nil
-(let ((broadcaster (make-instance 'module :id "broadcaster" :outputs (list "a" "b" "c"))))
+(let ((broadcaster (make-instance 'broadcaster :id "broadcaster" :outputs (list "a" "b" "c"))))
   (receive-pulse broadcaster "inv" (pulse :low))
   (receive-pulse broadcaster "inv" (pulse :low))
   (receive-pulse broadcaster "inv" (pulse :low))
@@ -328,3 +333,4 @@
   (dispatch broadcaster)
   (dispatch broadcaster)
   (received-pulses broadcaster))
+
