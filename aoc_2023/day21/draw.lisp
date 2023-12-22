@@ -60,7 +60,7 @@
       (loop for j below h do
         (loop for i below w do
           (let ((cell (aref array j i)))
-            (funcall cell-painter-fn stream (make-pos j i) cell)))
+            (funcall cell-painter-fn stream (make-pos i j) cell)))
         (funcall row-painter-fn stream j)))))
 
 (defun draw-array (stream array cell-fn)
