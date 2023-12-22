@@ -3,6 +3,7 @@
 (ql:quickload :arrows)
 (ql:quickload :alexandria)
 (ql:quickload :cl-ppcre)
+(ql:quickload :group-by)
 
 (use-package :arrows)
 
@@ -210,20 +211,48 @@
              (member supporter bricks-pulled-ids :test #'equal))
            supporters)))
 
-(defun chain-reaction-count (bricks support-network reverse-support-network)
+(defun chain-reaction-count (bricks dict support-network reverse-support-network)
+  ;; (if bricks
+  ;;     (if (not (every (lambda (b) (= (max-z-coord (gethash b dict))
+  ;;                                    (max-z-coord (gethash (car bricks) dict))))
+  ;;                     bricks))
+  ;;         (error "Thought all bricks on a support layer would have the same Z, but they don't!")))
+
+  (protect-against-infinite-loop!)
+
   (if (not bricks)
       0
-      (let ((falling-bricks (-> (loop for brick in bricks
-                                      append
-                                      (let* ((supports (gethash brick support-network)))
-                                        (remove-if-not (lambda (supported-brick-id)
-                                                         (brick-does-fall-p supported-brick-id
-                                                                            bricks
-                                                                            reverse-support-network))
-                                                       supports)))
-                                (remove-duplicates :test #'equal))))
+      (let*
+          ((grouped-and-sorted-by-z-bricks (-> (group-by:group-by bricks
+                                                                  :value #'identity
+                                                                  :key (lambda (b)
+                                                                         (max-z-coord (gethash b dict))))
+                                               (sort #'< :key #'car)))
+           (min-z-bricks (cdr (car grouped-and-sorted-by-z-bricks)))
+           (other-bricks (apply #'append
+                                (mapcar #'cdr
+                                        (cdr
+                                         grouped-and-sorted-by-z-bricks))))
+           (falling-bricks
+             (-> (loop for brick in min-z-bricks
+                       append
+                       (let ((supports (gethash brick support-network)))
+                         (remove-if-not
+                          (lambda (supported-brick-id)
+                            (brick-does-fall-p supported-brick-id
+                                               min-z-bricks
+                                               reverse-support-network))
+                          supports)))
+                 (remove-duplicates :test #'equal))))
+        ;; (format t "~&DICT = ~A (~A)"
+        ;;         dict
+        ;;         (alexandria:hash-table-alist dict))
         (+ (length falling-bricks)
-           (chain-reaction-count falling-bricks support-network reverse-support-network)))))
+           (chain-reaction-count (append other-bricks falling-bricks)
+                                 dict
+                                 support-network
+                                 reverse-support-network)))))
+
 
 (defun part2 (filename)
   (let ((*brick-id-cursor* 0))
@@ -281,10 +310,10 @@
 
       ;; (build-chain-reaction-count)
 
-      ;; (let ((bricks-dict (make-hash :size 150 :test #'equal)))
-      ;;   (loop for brick in placed-bricks do
-      ;;     (setf (gethash (brick-id brick) bricks-dict) brick))
-        (list support-network reverse-support-network))))
+      (let ((bricks-dict (make-hash-table :size 150 :test #'equal)))
+        (loop for brick in placed-bricks do
+          (setf (gethash (brick-id brick) bricks-dict) brick))
+        (list bricks-dict support-network reverse-support-network)))))
 ;; )
 
       ;; (let ((chain-reaction-counts (make-hash-table :size 150 :test #'equal))
@@ -310,11 +339,17 @@
       ;;       (incf count (length wobbly-bricks))))
       ;;   count)
 
-(format t "~10&---- START:")
-(destructuring-bind (support-net reverse-net) (part2 "input.txt")
-  (loop for key in (alexandria:hash-table-keys support-net)
-        sum
-        (chain-reaction-count (list key) support-net reverse-net)))
+(defun stash
+    ()
+  (format t "~10&---- START:")
+  (destructuring-bind (dict support-net reverse-net) (part2 "input.txt")
+    (loop for key in (alexandria:hash-table-keys support-net)
+          sum
+          (chain-reaction-count (list key) dict support-net reverse-net)))
+  )
+
+#+nil
+(stash)
 
 ; DONE: Plotting X and Z...
 ; .G.
