@@ -107,11 +107,6 @@
        (lib:read-file-lines)
        (mapcar #'parse-line)))
 
-(defun gen-range (range)
-  (if (< (cadr range) (car range))
-      (gen-range (reverse range))
-      (loop for n from (car range) to (cadr range) collect n)))
-
 (defun move-brick-directly-to-z (brick ground-zero)
   (with-slots (left-edge right-edge) brick
     (let ((dz (+ ground-zero (* -1 (min-z-coord brick)))))
@@ -208,28 +203,6 @@
          (if brick-at-pos
              (with-slots (id) brick-at-pos id)
              "."))))))
-
-(defun get-chain-reaction-fallen-bricks (brick counts support-network reverse-support-network)
-  (let* ((existing-count (gethash brick counts)))
-    (if existing-count
-        (progn (format t "~&Found existing: ~D for ~A" existing-count brick) existing-count)
-        (let* ((supports (gethash brick support-network))
-               (fallen-bricks (remove-if-not (lambda (supported-brick-id)
-                                               (= (length (gethash supported-brick-id
-                                                                   reverse-support-network))
-                                                  1))
-                                             supports)))
-          (if (not fallen-bricks)
-              (progn (format t "~&Brick: ~A does not uniquely support any other brick" brick) (setf (gethash brick counts) 0))
-              (progn (format t "~&Counting the knock on effect from yoinking brick: ~A (fallen = ~A" brick fallen-bricks)
-              (setf (gethash brick counts) (reduce #'+
-                                                   fallen-bricks
-                                                   :initial-value (length fallen-bricks)
-                                                   :key (lambda (fbrick)
-                                                          (get-chain-reaction-fallen-bricks fbrick
-                                                                                            counts
-                                                                                            support-network
-                                                                                            reverse-support-network))))))))))
 
 (defun brick-does-fall-p (brick-id bricks-pulled-ids reverse-support-network)
   (let ((supporters (gethash brick-id reverse-support-network)))
