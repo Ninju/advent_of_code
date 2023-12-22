@@ -32,3 +32,20 @@
      (if (< *iter-limit* 0)
          (progn (setf *iter-limit* 0)
                 (error "Reached iteration limit!")))))
+
+(defun make-brick (lhs rhs) (list lhs rhs))
+
+(defun parse-coords (coords)
+  (mapcar #'parse-integer (ppcre:split "," coords)))
+
+(defun parse-line (line)
+  (destructuring-bind (lhs rhs) (ppcre:split "~" line)
+    (make-brick (parse-coords lhs) (parse-coords rhs))))
+
+(defun load-from-file (filename)
+  (->> (get-inputs-pathname filename)
+       (lib:read-file-lines)
+       (mapcar #'parse-line)))
+
+#+nil
+(load-from-file "example.txt")
