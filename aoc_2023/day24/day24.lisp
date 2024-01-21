@@ -164,6 +164,7 @@
                       (* scalar (aref matrix j i)))))
       results)))
 
+;; lla:solve fails on real input (see failing test case in test.lisp)
 (defun solve-linear-equations (ma mb)
   (let* ((a (aref ma 0 0))
          (b (aref ma 0 1))
@@ -173,6 +174,7 @@
          (ad (* a d))
          (bc (* b c))
 
+         ; lla:det returns 0 for determinant when dividing by 0
          (det (handler-case (/ 1 (- ad bc))
                 (division-by-zero (c)
                   (declare (ignore c))
@@ -194,13 +196,13 @@
             (i1 (initial-position ray-1))
             (i2 (initial-position ray-2)))
 
-        (let ((Ma (make-array '(2 2)
-                              :initial-contents (list (list (vx d1) (- (vx d2)))
-                                                      (list (vy d1) (- (vy d2))))))
-              (Mb (make-array '(2 1)
-                              :initial-contents (list (list (- (vx i2) (vx i1)))
-                                                      (list (- (vy i2) (vy i1)))))))
-          (let ((solutions (solve-linear-equations Ma Mb)))
+        (let ((A (make-array '(2 2)
+                             :initial-contents (list (list (vx d1) (- (vx d2)))
+                                                     (list (vy d1) (- (vy d2))))))
+              (b (make-array '(2 1)
+                             :initial-contents (list (list (- (vx i2) (vx i1)))
+                                                     (list (- (vy i2) (vy i1)))))))
+          (let ((solutions (solve-linear-equations A b)))
             (when solutions
               (let ((solution-a (aref solutions 0 0))
                     (solution-b (aref solutions 1 0)))

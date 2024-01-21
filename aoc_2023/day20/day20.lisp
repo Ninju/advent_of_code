@@ -308,8 +308,15 @@
                                    :direction :output
                                    :if-exists :supersede)
   (part1 "input.txt"))
+
  ; => 1092834855 (31 bits, #x41235627)
 ; Pressed 1000 times => (26145 41799)
+
+#+nil
+(with-open-file (*standard-output* "standard_output.log"
+                                   :direction :output
+                                   :if-exists :supersede)
+  (part1 "interesting_example.txt"))
 
 #+nil
 (let* ((modules (load-modules-from-file "input.txt"))

@@ -155,12 +155,6 @@
                   :width (abs (+ 1 (- (x-coord upper) (x-coord lower))))
                   :height (abs (+ 1 (- (y-coord upper) (y-coord lower)))))))
 
-(defun take (n lst)
-  (loop for e in lst
-        and i from 1 to n
-        collect
-        (elt lst i)))
-
 (defun point-within-rect-p (pos rect)
   (rectangles-overlap-p (make-rect pos pos)
                         rect))
@@ -212,12 +206,6 @@
            supporters)))
 
 (defun chain-reaction-count (bricks dict support-network reverse-support-network)
-  ;; (if bricks
-  ;;     (if (not (every (lambda (b) (= (max-z-coord (gethash b dict))
-  ;;                                    (max-z-coord (gethash (car bricks) dict))))
-  ;;                     bricks))
-  ;;         (error "Thought all bricks on a support layer would have the same Z, but they don't!")))
-
   (protect-against-infinite-loop!)
 
   (if (not bricks)
@@ -315,29 +303,6 @@
           (setf (gethash (brick-id brick) bricks-dict) brick))
         (list bricks-dict support-network reverse-support-network)))))
 ;; )
-
-      ;; (let ((chain-reaction-counts (make-hash-table :size 150 :test #'equal))
-      ;;       (count 0))
-      ;;   (loop for key in (alexandria:hash-table-keys support-network) do
-      ;;     (incf count (get-chain-reaction-fallen-bricks key chain-reaction-counts support-network reverse-support-network))
-      ;;     )
-      ;;   chain-reaction-counts)
-
-      ;; (let ((count 0))
-      ;;   (loop for brick in placed-bricks do
-      ;;     (let* ((bricks-above (->> placed-bricks
-      ;;                              (remove-if (lambda (b) (eq (brick-id b)
-      ;;                                                         (brick-id brick))))
-      ;;                              (remove-if (lambda (b) (<= (max-z-coord b)
-      ;;                                                         (max-z-coord brick))))
-      ;;                              (remove-if-not (lambda (b) (rectangles-overlap-p (brick-bounding-rect b)
-      ;;                                                                               (brick-bounding-rect brick))))))
-      ;;            (wobbly-bricks (->> bricks-above
-      ;;                                (remove-if-not (lambda (b) (= 1 (length
-      ;;                                                                 (gethash (brick-id b) reverse-support-network))))))))
-      ;;       (format t "~&BRICK = ~A, ABOVE = ~A" (brick-id brick) (mapcar #'brick-id bricks-above))
-      ;;       (incf count (length wobbly-bricks))))
-      ;;   count)
 
 (defun stash
     ()
