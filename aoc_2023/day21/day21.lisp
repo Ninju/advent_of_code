@@ -196,7 +196,7 @@
          (length))))
 
 #+nil
-(part1 "example.txt" 6)
+(part1 "input.txt" 64)
 
 #+nil
 (let* ((SLYNK-STICKERS:*BREAK-ON-STICKERS* (list :after))

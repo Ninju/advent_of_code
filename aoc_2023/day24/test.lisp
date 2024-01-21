@@ -101,16 +101,7 @@
   (fiveam:run! 'test-ray-find-intersection-on-examples))
 
 #|
-(defun matrix-scalar-multiply (scalar matrix)
-  (destructuring-bind (h w) (array-dimensions matrix)
-    (let ((results (make-array (list h w))))
-    (loop for j from 0 below h
-          do
-          (loop for i from 0 below w
-                do
-                (setf (aref results j i)
-                      (* scalar (aref matrix j i)))))
-      results)))
+
 |#
 
 (test test-ray-find-intersection-on-input

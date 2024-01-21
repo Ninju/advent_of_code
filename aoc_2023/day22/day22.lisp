@@ -195,14 +195,14 @@
                                      (z-rhs (z-coord rhs)))
 
                                 (point-within-rect-p
-                                 (invert pos dimensions)
+                                 pos
                                  (make-rect (list u-lhs z-lhs)
                                             (list u-rhs z-rhs)))))
                             bricks)))
 
          (if brick-at-pos
              (with-slots (id) brick-at-pos id)
-             "."))))))
+             "..."))))))
 
 (defun part1 (filename)
   (let ((*brick-id-cursor* 0))
@@ -251,11 +251,11 @@
                                                    (+ 1 max-z))
                         placed-bricks))))))
 
-      ;; (format t "~2&DONE: Plotting X and Z")
-      ;; (visualize-z #'x-coord placed-bricks '(7 3))
+      (format t "~2&DONE: Plotting X and Z~%")
+      (visualize-z #'x-coord placed-bricks '(10 350))
 
-      ;; (format t "~2&DONE: Plotting Y and Z")
-      ;; (visualize-z #'y-coord placed-bricks '(7 3))
+      (format t "~2&DONE: Plotting Y and Z~%")
+      (visualize-z #'y-coord placed-bricks '(10 350))
 
       (let ((count 0))
         (loop for key in (alexandria:hash-table-keys support-network) do
@@ -270,7 +270,7 @@
                     (incf count)))))
         count))))
 
-(part1 "input.txt")
+(part1 "example.txt")
 
 ; DONE: Plotting X and Z...
 ; .G.

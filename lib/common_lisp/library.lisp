@@ -214,4 +214,13 @@
                           (setf (aref result j i) cur)))))
           result))
 
+(defun take (n lst)
+  (if (<= n 0)
+      (values lst NIL)
+      (handler-case (values (subseq lst 0 n) (subseq lst n))
+        (sb-kernel:bounding-indices-bad-error (c) (values lst NIL)))))
 
+(defun partition-by (pred lst)
+  (list
+   (remove-if pred lst)
+   (remove-if-not pred lst)))
